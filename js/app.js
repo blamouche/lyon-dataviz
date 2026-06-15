@@ -1,5 +1,5 @@
 /* ============================================================
-   Lyon Analytics — logique applicative
+   Lyon Data — logique applicative
    - Catalogue de couches librement combinables (les thèmes ne
      sont que des présélections)
    - Analyse par zone (arrondissements / quartiers) : comptage
@@ -130,6 +130,7 @@ THEMES.forEach((theme) => {
 
 // Catalogue complet, groupé par famille
 const catalog = $("#layer-catalog");
+const subgroupSyncFns = []; // resynchronisation des cases maîtresses de sous-rubrique
 THEMES.forEach((theme) => {
   const details = document.createElement("details");
   details.className = "layer-group";
@@ -139,10 +140,70 @@ THEMES.forEach((theme) => {
       <span class="grp-count" id="grpcount-${theme.id}"></span></summary>`;
   const ul = document.createElement("ul");
   ul.className = "layer-list";
-  theme.layers.forEach((def) => ul.appendChild(buildLayerItem(def)));
+  // Certaines couches déclarent une sous-rubrique (ex. Transports →
+  // Métro / Tramway / Bus) : on les regroupe dans un <details> imbriqué
+  // doté d'une case maîtresse « tout activer / désactiver ».
+  const subLists = new Map(); // libellé de sous-rubrique -> <ul> cible
+  theme.layers.forEach((def) => {
+    const item = buildLayerItem(def);
+    if (!def.subgroup) { ul.appendChild(item); return; }
+    let subUl = subLists.get(def.subgroup);
+    if (!subUl) {
+      const sub = document.createElement("details");
+      sub.className = "layer-subgroup";
+      sub.open = true;
+
+      const summary = document.createElement("summary");
+      const master = document.createElement("input");
+      master.type = "checkbox";
+      master.className = "subgroup-toggle";
+      master.title = "Tout activer / désactiver";
+      const label = document.createElement("span");
+      label.className = "subgroup-label";
+      label.textContent = def.subgroup;
+      summary.append(master, label);
+      sub.appendChild(summary);
+
+      subUl = document.createElement("ul");
+      subUl.className = "layer-list";
+      sub.appendChild(subUl);
+
+      const childChecks = () =>
+        [...subUl.querySelectorAll(".layer-item > input[type=checkbox]")];
+      // La case maîtresse pilote les couches de la sous-rubrique…
+      master.addEventListener("click", (e) => e.stopPropagation()); // ne replie pas le <details>
+      master.addEventListener("change", () => {
+        childChecks().forEach((c) => {
+          if (c.checked !== master.checked) {
+            c.checked = master.checked;
+            c.dispatchEvent(new Event("change"));
+          }
+        });
+      });
+      // …et reflète l'état réel des couches (cochée / mixte / décochée).
+      const sync = () => {
+        const kids = childChecks();
+        const on = kids.filter((c) => c.checked).length;
+        master.checked = kids.length > 0 && on === kids.length;
+        master.indeterminate = on > 0 && on < kids.length;
+      };
+      subUl.addEventListener("change", sync); // clic sur une couche enfant
+      subgroupSyncFns.push(sync);
+
+      const wrapper = document.createElement("li");
+      wrapper.className = "layer-subgroup-item";
+      wrapper.appendChild(sub);
+      ul.appendChild(wrapper);
+      subLists.set(def.subgroup, subUl);
+    }
+    subUl.appendChild(item);
+  });
   details.appendChild(ul);
   catalog.appendChild(details);
 });
+// Resynchronise les cases maîtresses des sous-rubriques avec l'état des couches
+// (utile après applyPreset, qui coche les couches sans émettre d'événement).
+function syncSubgroupToggles() { subgroupSyncFns.forEach((fn) => fn()); }
 
 function buildLayerItem(def) {
   const li = document.createElement("li");
@@ -202,6 +263,13 @@ $("#layer-search").addEventListener("input", (e) => {
       li.style.display = show ? "" : "none";
       if (show) visible++;
     });
+    // Masque les sous-rubriques sans résultat ; les déplie pendant la recherche
+    grp.querySelectorAll(".layer-subgroup-item").forEach((wrap) => {
+      const hasMatch = [...wrap.querySelectorAll(".layer-item")]
+        .some((li) => li.style.display !== "none");
+      wrap.style.display = hasMatch ? "" : "none";
+      if (q && hasMatch) wrap.querySelector(".layer-subgroup").open = true;
+    });
     grp.style.display = visible ? "" : "none";
     if (q) grp.open = true;
   });
@@ -223,6 +291,7 @@ function applyPreset(theme) {
   document.querySelectorAll(".layer-group").forEach((grp) => {
     grp.open = grp.id === `grp-${theme.id}`;
   });
+  syncSubgroupToggles();
 }
 
 // ============================================================
@@ -277,6 +346,7 @@ function buildLayer(def) {
     case "dvf-choropleth": return buildDvfChoropleth(def);
     case "dvf-points": return buildDvfPoints(def);
     case "delinquance-choropleth": return buildCrimeLayer(def);
+    case "eau-potable-choropleth": return buildEauPotableLayer(def);
     default: throw new Error(`Type de couche inconnu : ${def.type}`);
   }
 }
@@ -505,7 +575,17 @@ async function buildWfsLayer(def) {
   geojson.features = features;
 
   const layer = L.geoJSON(geojson, {
+    // NB : Leaflet applique aussi `style` aux marqueurs issus de pointToLayer
+    // (via resetStyle). Pour les points, on doit donc y reproduire la couleur
+    // par objet (stationColorFn), sinon `fillColor: def.color` l'écraserait.
     style: (feature) => {
+      const t = feature.geometry && feature.geometry.type;
+      if (t === "Point" || t === "MultiPoint") {
+        const fillColor = def.stationColorFn
+          ? def.stationColorFn(feature.properties, def.color)
+          : def.color;
+        return { color: "#0d1117", weight: 1.5, fillColor, fillOpacity: 0.95, opacity: 1 };
+      }
       let color = def.color;
       if (def.lineColorField && feature.properties[def.lineColorField]) {
         color = feature.properties[def.lineColorField];
@@ -836,6 +916,89 @@ function restyleCrimeLayer() {
   });
 }
 
+// ---------- Eau potable (contrôle sanitaire ARS / Hub'Eau) ----------
+const eauIsConforme = (c) => !!c && /conforme/i.test(c) && !/non conforme/i.test(c);
+
+function eauPopup(def, props, agg) {
+  const name = props.nomreduit || props.nom;
+  if (!agg) {
+    return `<div class="popup-title">${name}</div>
+      <div class="popup-row"><span class="k">Eau potable :</span><span>aucun contrôle récent</span></div>
+      <div class="popup-src">Source : ${def.source}</div>`;
+  }
+  const conf = eauIsConforme(agg.latest.conclusion_conformite_prelevement);
+  const rate = agg.total ? Math.round((agg.conformes / agg.total) * 100) : null;
+  const cmap = { C: "Conforme", N: "Non conforme", D: "Dérogation", S: "Surveillance" };
+  const fmtC = (v) => cmap[v] || v || "—";
+  const d = agg.latest.date_prelevement ? agg.latest.date_prelevement.slice(0, 10) : "—";
+  return `<div class="popup-title">${name}</div>
+    <div class="popup-row"><span class="k">Verdict :</span><span><strong>${conf ? "✓ Eau conforme" : "⚠ Non conforme"}</strong></span></div>
+    <div class="popup-row"><span class="k">Conformité bactério. :</span><span>${fmtC(agg.latest.conformite_limites_bact_prelevement)}</span></div>
+    <div class="popup-row"><span class="k">Conformité physico-chim. :</span><span>${fmtC(agg.latest.conformite_limites_pc_prelevement)}</span></div>
+    <div class="popup-row"><span class="k">Taux de conformité (6 mois) :</span><span class="v-num">${rate != null ? rate + " %" : "—"}</span></div>
+    <div class="popup-row"><span class="k">Prélèvements analysés :</span><span class="v-num">${agg.total}</span></div>
+    <div class="popup-row"><span class="k">Dernier contrôle :</span><span class="v-num">${d}</span></div>
+    <div class="popup-src">Source : ${def.source} — contrôle sanitaire</div>`;
+}
+
+async function buildEauPotableLayer(def) {
+  // 1) Polygones des communes de la Métropole
+  const resp = await fetch(COMMUNES_WFS);
+  if (!resp.ok) throw new Error(`Communes : HTTP ${resp.status}`);
+  const communes = await resp.json();
+  communes.features = communes.features.filter(
+    (f) => f.properties.communegl === true && f.properties.insee);
+  const inseeList = [...new Set(communes.features.map((f) => f.properties.insee))];
+
+  // 2) Résultats du contrôle sanitaire (≈ 1 ligne par prélèvement, triées par date desc).
+  //    Hub'Eau limite à 20 communes par requête → on découpe en lots parallèles.
+  const chunks = [];
+  for (let i = 0; i < inseeList.length; i += EAU_COMMUNES_PAR_REQUETE) {
+    chunks.push(inseeList.slice(i, i + EAU_COMMUNES_PAR_REQUETE));
+  }
+  const results = await Promise.all(chunks.map(async (chunk) => {
+    const hu = await fetch(eauPotableUrl(chunk));
+    if (!hu.ok) throw new Error(`Hub'Eau : HTTP ${hu.status}`);
+    return (await hu.json()).data || [];
+  }));
+  const rows = results.flat();
+
+  // 3) Agrégation par commune : dernier prélèvement + taux de conformité
+  const byCommune = new Map(); // insee -> { latest, total, conformes }
+  for (const r of rows) {
+    let agg = byCommune.get(r.code_commune);
+    if (!agg) { agg = { latest: r, total: 0, conformes: 0 }; byCommune.set(r.code_commune, agg); }
+    agg.total++;
+    if (eauIsConforme(r.conclusion_conformite_prelevement)) agg.conformes++;
+  }
+
+  const stats = [];
+  const layer = L.geoJSON(communes, {
+    style: (feature) => {
+      const agg = byCommune.get(feature.properties.insee);
+      const verdict = agg
+        ? (eauIsConforme(agg.latest.conclusion_conformite_prelevement) ? "conforme" : "nonconforme")
+        : "nodata";
+      return { color: "#0d1117", weight: 1.2, fillColor: EAU_COLORS[verdict], fillOpacity: 0.6 };
+    },
+    onEachFeature: (feature, lyr) => {
+      const agg = byCommune.get(feature.properties.insee);
+      stats.push({
+        insee: feature.properties.insee,
+        nom: feature.properties.nomreduit || feature.properties.nom,
+        total: agg?.total || 0, conformes: agg?.conformes || 0
+      });
+      lyr._layerDef = def;
+      lyr._poiProps = { ...feature.properties, source: def.source };
+      lyr.bindPopup(eauPopup(def, feature.properties, agg));
+    }
+  });
+  layer._featureCount = communes.features.length;
+  layer._isEau = true;
+  layer._eauStats = stats;
+  return layer;
+}
+
 // ============================================================
 // Analyse par zone
 // ============================================================
@@ -1154,9 +1317,33 @@ function updateInsights() {
       kpis.push({ value: cityRate.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + '<span class="unit"> ‰</span>', label: "Taux ville (pour 1 000 hab.)" });
     }
   }
+  const air = activeLayers.get("air-indice");
+  if (air) {
+    let lyon = null;
+    air.eachLayer((m) => {
+      const p = m._poiProps;
+      if (p && p.code_zone === "69123") lyon = p;
+    });
+    if (lyon?.lib_qual) {
+      kpis.push({ value: lyon.lib_qual, label: "Qualité de l'air à Lyon · aujourd'hui", highlight: true });
+    }
+    kpis.push({ value: (air._featureCount ?? 0).toLocaleString("fr-FR"), label: "Communes suivies (agglo.)" });
+  }
+  const eau = activeLayers.get("eau-potable");
+  if (eau?._eauStats) {
+    const s = eau._eauStats.filter((x) => x.total > 0);
+    const totalPrel = s.reduce((a, b) => a + b.total, 0);
+    const totalConf = s.reduce((a, b) => a + b.conformes, 0);
+    const rate = totalPrel ? Math.round((totalConf / totalPrel) * 100) : null;
+    if (rate != null) {
+      kpis.push({ value: rate + '<span class="unit"> %</span>', label: "Prélèvements conformes · 6 mois", highlight: true });
+    }
+    kpis.push({ value: totalPrel.toLocaleString("fr-FR"), label: "Prélèvements analysés" });
+    kpis.push({ value: s.length.toLocaleString("fr-FR"), label: "Communes contrôlées" });
+  }
   for (const def of ALL_LAYERS) {
     if (!activeLayers.has(def.id)) continue;
-    if (["velov", "dvf", "delinquance"].includes(def.id)) continue;
+    if (["velov", "dvf", "delinquance", "air-indice", "eau-potable"].includes(def.id)) continue;
     kpis.push({ value: (activeLayers.get(def.id)._featureCount ?? 0).toLocaleString("fr-FR"), label: def.name });
   }
   if (kpis.length) {
@@ -1246,6 +1433,16 @@ function updateLegend() {
             : `${fmt(breaks[i - 1])} – ${fmt(breaks[i])}`;
         html += `<div class="row"><span class="chip square" style="background:${CRIME_COLORS[i]}"></span>${label}</div>`;
       }
+    } else if (def.legend === "atmo") {
+      html += `<div><strong>Indice ATMO du jour</strong></div>`;
+      for (const s of ATMO_SCALE) {
+        html += `<div class="row"><span class="chip" style="background:${s.color}"></span>${s.label}</div>`;
+      }
+    } else if (layer._isEau) {
+      html += `<div><strong>Eau potable · contrôle sanitaire</strong></div>
+               <div class="row"><span class="chip square" style="background:${EAU_COLORS.conforme}"></span>Conforme</div>
+               <div class="row"><span class="chip square" style="background:${EAU_COLORS.nonconforme}"></span>Non conforme</div>
+               <div class="row"><span class="chip square" style="background:${EAU_COLORS.nodata}"></span>Pas de contrôle récent</div>`;
     } else if (def.id === "velov") {
       html += `<div class="row"><span class="chip" style="background:#34d399"></span>Vélo'v : 4 vélos ou +</div>
                <div class="row"><span class="chip" style="background:#fbbf24"></span>Vélo'v : 1 à 3 vélos</div>

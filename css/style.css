@@ -1,5 +1,5 @@
 /* ============================================================
-   Lyon Analytics — thème sombre aux couleurs de Lyon
+   Lyon Data — thème sombre aux couleurs de Lyon
    Identité : bleu #003594 + rouge #EF3340 (Ville de Lyon)
    Typographies : Inter (texte) + JetBrains Mono (valeurs)
    ============================================================ */
@@ -241,6 +241,45 @@ body { display: flex; flex-direction: column; }
   padding: 0.08rem 0.4rem;
 }
 .layer-group .layer-list { padding: 0.35rem; border-top: 1px solid var(--border); }
+
+/* ---------- Sous-rubriques (ex. Transports → Métro / Tram / Bus) ---------- */
+.layer-subgroup-item { list-style: none; }
+.layer-subgroup {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel-2);
+  overflow: hidden;
+}
+.layer-subgroup > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  user-select: none;
+}
+.layer-subgroup > summary::-webkit-details-marker { display: none; }
+.layer-subgroup > summary::before {
+  content: "▸";
+  color: var(--ink-faint);
+  font-size: 0.65rem;
+  transition: transform 0.15s;
+}
+.layer-subgroup[open] > summary::before { transform: rotate(90deg); }
+.layer-subgroup > summary:hover { color: var(--accent); }
+.layer-subgroup > summary .subgroup-toggle {
+  accent-color: var(--accent);
+  width: 0.95rem; height: 0.95rem;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.layer-subgroup .layer-list { border-top: 1px solid var(--border); }
 
 /* ---------- Analyse par zone ---------- */
 .zone-toggle {

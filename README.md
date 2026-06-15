@@ -1,4 +1,4 @@
-# Lyon Analytics
+# Lyon Data
 
 Plateforme d'exploration des données ouvertes de la ville de Lyon, pensée pour
 des utilisateurs **non techniques** : on choisit un thème, la carte affiche les
@@ -14,6 +14,8 @@ Le design system est documenté dans [PRD.md](PRD.md).
 |---|---|
 | 🚇 Transports | Lignes de métro/funiculaire et tramway, stations Vélo'v **en temps réel**, arrêts TCL, pistes cyclables, autopartage, bornes de recharge |
 | 🌳 Qualité de vie | Parcs et jardins, marchés, piscines, musées, toilettes publiques |
+| 🌬️ Environnement | Indice ATMO du jour (qualité de l'air) par commune de l'agglomération, **en temps réel** |
+| 💧 Eau | Contrôle sanitaire de l'eau potable (conformité ARS) par commune de la Métropole, **en direct** |
 | 🛡️ Sécurité & santé | Commissariats, casernes de pompiers, hôpitaux, défibrillateurs, pharmacies |
 | 🏠 Logement | Prix médian au m² des appartements par arrondissement (ventes DVF 2024) + détail de chaque vente |
 | 🎓 Éducation & famille | Écoles, collèges, lycées, crèches |
@@ -43,6 +45,12 @@ sauf les prix immobiliers (pré-compilés, voir ci-dessous) :
   Demandes de valeurs foncières (DVF) géolocalisées, DGFiP/Etalab.
 - **[OpenStreetMap](https://www.openstreetmap.org)** via l'API Overpass —
   commissariats, casernes de pompiers, pharmacies.
+- **[Atmo France](https://www.atmo-france.org)** (flux WFS national agrégeant les
+  AASQA, ici Atmo Auvergne-Rhône-Alpes) — indice ATMO quotidien de la qualité de
+  l'air par commune, sous licence ODbL.
+- **[Hub'Eau](https://hubeau.eaufrance.fr)** (API du Système d'information sur
+  l'eau) — résultats du contrôle sanitaire de l'eau potable (ARS / Ministère de
+  la Santé), agrégés par commune.
 - **Fond de carte** : tuiles CARTO Positron, données © contributeurs OpenStreetMap.
 
 ## Mise à jour annuelle des prix immobiliers

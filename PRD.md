@@ -1,8 +1,8 @@
-# PRD — Lyon Analytics
+# PRD — Lyon Data
 
 | | |
 |---|---|
-| **Produit** | Lyon Analytics — plateforme d'exploration des données ouvertes de la ville de Lyon |
+| **Produit** | Lyon Data — plateforme d'exploration des données ouvertes de la ville de Lyon |
 | **Version du document** | 1.1 |
 | **Date** | 12 juin 2026 |
 | **Statut** | V1.1 livrée (refonte UI « plateforme analytique ») |
@@ -15,7 +15,7 @@ Les données ouvertes sur Lyon sont abondantes (Métropole de Lyon, Ville de Lyo
 État, OpenStreetMap) mais **dispersées sur plusieurs portails et présentées dans
 des formats techniques** (WFS, GeoJSON, CSV) inaccessibles au grand public.
 
-**Lyon Analytics** rassemble ces données sur une carte unique et les rend
+**Lyon Data** rassemble ces données sur une carte unique et les rend
 explorables par **des personnes sans aucune compétence technique** : on choisit
 un thème de la vie quotidienne, la carte affiche les informations
 correspondantes, accompagnées d'une synthèse chiffrée (indicateurs, graphique).
