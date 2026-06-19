@@ -30,7 +30,11 @@ function applyTheme(theme, { persist = true, syncBasemap = true } = {}) {
   if (persist) localStorage.setItem(THEME_KEY, theme);
 
   const themeBtn = document.getElementById("btn-theme");
-  if (themeBtn) themeBtn.textContent = theme === "dark" ? "☀ Clair" : "🌙 Sombre";
+  if (themeBtn) {
+    const icon = theme === "dark" ? "fa-sun" : "fa-moon";
+    const label = theme === "dark" ? "Clair" : "Sombre";
+    themeBtn.innerHTML = `<i class="fa-solid ${icon}"></i> ${label}`;
+  }
 
   if (syncBasemap && typeof map !== "undefined") syncMapBasemapWithTheme(theme);
 }
