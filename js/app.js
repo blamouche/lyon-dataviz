@@ -109,6 +109,7 @@ const LAYER_BY_ID = new Map(ALL_LAYERS.map((l) => [l.id, l]));
 
 const layerCache = new Map();   // layerId -> Promise<L.Layer>
 const activeLayers = new Map(); // layerId -> L.Layer
+const activeThemes = new Set(); // thèmes actuellement sélectionnés (filtre multi-thèmes)
 let dvfDataPromise = null;
 let arrondGeojsonPromise = null;
 
@@ -157,7 +158,7 @@ THEMES.forEach((theme) => {
   btn.className = "theme-btn";
   btn.dataset.theme = theme.id;
   btn.innerHTML = `<span class="emoji">${theme.emoji}</span><span>${theme.label}</span>`;
-  btn.addEventListener("click", () => applyPreset(theme));
+  btn.addEventListener("click", () => toggleTheme(theme));
   themeGrid.appendChild(btn);
 });
 
@@ -168,7 +169,7 @@ THEMES.forEach((theme) => {
   const details = document.createElement("details");
   details.className = "layer-group";
   details.id = `grp-${theme.id}`;
-  details.open = theme.id === "transports";
+  details.open = false;
   details.innerHTML = `<summary>${theme.emoji} ${theme.label}
       <span class="grp-count" id="grpcount-${theme.id}"></span></summary>`;
   const ul = document.createElement("ul");
@@ -235,7 +236,7 @@ THEMES.forEach((theme) => {
   catalog.appendChild(details);
 });
 // Resynchronise les cases maîtresses des sous-rubriques avec l'état des couches
-// (utile après applyPreset, qui coche les couches sans émettre d'événement).
+// (utile après toggleTheme, qui coche les couches sans émettre d'événement).
 function syncSubgroupToggles() { subgroupSyncFns.forEach((fn) => fn()); }
 
 function buildLayerItem(def) {
@@ -308,21 +309,39 @@ $("#layer-search").addEventListener("input", (e) => {
   });
 });
 
-// Une présélection (re)définit l'ensemble des couches affichées
-function applyPreset(theme) {
-  document.querySelectorAll(".theme-btn").forEach((b) =>
-    b.classList.toggle("active", b.dataset.theme === theme.id)
-  );
-  for (const def of ALL_LAYERS) {
-    const want = def.themeId === theme.id && def.defaultOn;
-    const chk = $(`#chk-${def.id}`);
-    if (chk.checked !== want) {
-      chk.checked = want;
-      toggleLayer(def, want);
+// Une présélection agit comme un filtre : plusieurs thèmes peuvent être
+// sélectionnés (union de leurs couches par défaut) ou aucun.
+function toggleTheme(theme) {
+  const already = activeThemes.has(theme.id);
+  if (already) {
+    activeThemes.delete(theme.id);
+    // Retire toutes les couches de ce thème
+    for (const def of ALL_LAYERS) {
+      if (def.themeId !== theme.id) continue;
+      const chk = $(`#chk-${def.id}`);
+      if (chk && chk.checked) {
+        chk.checked = false;
+        toggleLayer(def, false);
+      }
+    }
+  } else {
+    activeThemes.add(theme.id);
+    // Ajoute les couches par défaut de ce thème sans toucher aux autres
+    for (const def of ALL_LAYERS) {
+      if (def.themeId !== theme.id || !def.defaultOn) continue;
+      const chk = $(`#chk-${def.id}`);
+      if (chk && !chk.checked) {
+        chk.checked = true;
+        toggleLayer(def, true);
+      }
     }
   }
+
+  document.querySelectorAll(".theme-btn").forEach((b) =>
+    b.classList.toggle("active", activeThemes.has(b.dataset.theme))
+  );
   document.querySelectorAll(".layer-group").forEach((grp) => {
-    grp.open = grp.id === `grp-${theme.id}`;
+    grp.open = activeThemes.has(grp.id.replace("grp-", ""));
   });
   syncSubgroupToggles();
 }
@@ -1491,8 +1510,8 @@ function updateLegend() {
 // ---------- Dialog sources ----------
 $("#btn-sources").addEventListener("click", () => $("#sources-dialog").showModal());
 
-// ---------- Démarrage : présélection Transports ----------
-applyPreset(THEMES[0]);
+// ---------- Démarrage : aucun thème présélectionné ----------
+// L'utilisateur active lui-même les filtres thématiques.
 
 // ---------- Compteur de visites ----------
 (async function updateVisitCounter() {
