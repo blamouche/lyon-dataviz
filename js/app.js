@@ -41,7 +41,7 @@ function applyTheme(theme, { persist = true, syncBasemap = true } = {}) {
 applyTheme(getStoredTheme(), { syncBasemap: false });
 
 // ---------- Carte ----------
-const map = L.map("map", { zoomControl: false }).setView([45.7578, 4.8351], 13);
+const map = L.map("map", { zoomControl: false, minZoom: 12 }).setView([45.7578, 4.8351], 12);
 L.control.zoom({ position: "bottomleft" }).addTo(map);
 L.control.scale({ position: "bottomleft", imperial: false }).addTo(map);
 
@@ -101,15 +101,15 @@ function updateObjectCount() {
 
 // ---------- État ----------
 const ALL_LAYERS = [];
-THEMES.forEach((t) => t.layers.forEach((l) => {
-  l.themeId = t.id; l.themeLabel = t.label; l.themeEmoji = t.emoji;
+CATALOG.forEach((c) => c.layers.forEach((l) => {
+  l.categoryId = c.id; l.categoryLabel = c.label; l.categoryEmoji = c.emoji;
   ALL_LAYERS.push(l);
 }));
 const LAYER_BY_ID = new Map(ALL_LAYERS.map((l) => [l.id, l]));
 
 const layerCache = new Map();   // layerId -> Promise<L.Layer>
 const activeLayers = new Map(); // layerId -> L.Layer
-const activeThemes = new Set(); // thèmes actuellement sélectionnés (filtre multi-thèmes)
+const activePreselections = new Set(); // présélections actives (filtre multi-thèmes)
 let dvfDataPromise = null;
 let arrondGeojsonPromise = null;
 
@@ -152,33 +152,36 @@ function hideStatus() {
 // ============================================================
 // Interface : présélections + catalogue
 // ============================================================
+// Présélections thématiques : chaque bouton active un ensemble de couches
+// piochées dans n'importe quelle catégorie du catalogue.
 const themeGrid = $("#theme-grid");
-THEMES.forEach((theme) => {
+PRESELECTIONS.forEach((presel) => {
   const btn = document.createElement("button");
   btn.className = "theme-btn";
-  btn.dataset.theme = theme.id;
-  btn.innerHTML = `<span class="emoji">${theme.emoji}</span><span>${theme.label}</span>`;
-  btn.addEventListener("click", () => toggleTheme(theme));
+  btn.dataset.preselection = presel.id;
+  if (presel.hint) btn.title = presel.hint;
+  btn.innerHTML = `<span class="emoji">${presel.emoji}</span><span>${presel.label}</span>`;
+  btn.addEventListener("click", () => togglePreselection(presel));
   themeGrid.appendChild(btn);
 });
 
-// Catalogue complet, groupé par famille
+// Catalogue complet, groupé par catégorie (nature des données)
 const catalog = $("#layer-catalog");
 const subgroupSyncFns = []; // resynchronisation des cases maîtresses de sous-rubrique
-THEMES.forEach((theme) => {
+CATALOG.forEach((category) => {
   const details = document.createElement("details");
   details.className = "layer-group";
-  details.id = `grp-${theme.id}`;
+  details.id = `grp-${category.id}`;
   details.open = false;
-  details.innerHTML = `<summary>${theme.emoji} ${theme.label}
-      <span class="grp-count" id="grpcount-${theme.id}"></span></summary>`;
+  details.innerHTML = `<summary>${category.emoji} ${category.label}
+      <span class="grp-count" id="grpcount-${category.id}"></span></summary>`;
   const ul = document.createElement("ul");
   ul.className = "layer-list";
   // Certaines couches déclarent une sous-rubrique (ex. Transports →
   // Métro / Tramway / Bus) : on les regroupe dans un <details> imbriqué
   // doté d'une case maîtresse « tout activer / désactiver ».
   const subLists = new Map(); // libellé de sous-rubrique -> <ul> cible
-  theme.layers.forEach((def) => {
+  category.layers.forEach((def) => {
     const item = buildLayerItem(def);
     if (!def.subgroup) { ul.appendChild(item); return; }
     let subUl = subLists.get(def.subgroup);
@@ -236,7 +239,7 @@ THEMES.forEach((theme) => {
   catalog.appendChild(details);
 });
 // Resynchronise les cases maîtresses des sous-rubriques avec l'état des couches
-// (utile après toggleTheme, qui coche les couches sans émettre d'événement).
+// (utile après togglePreselection, qui coche les couches sans émettre d'événement).
 function syncSubgroupToggles() { subgroupSyncFns.forEach((fn) => fn()); }
 
 function buildLayerItem(def) {
@@ -309,39 +312,51 @@ $("#layer-search").addEventListener("input", (e) => {
   });
 });
 
-// Une présélection agit comme un filtre : plusieurs thèmes peuvent être
-// sélectionnés (union de leurs couches par défaut) ou aucun.
-function toggleTheme(theme) {
-  const already = activeThemes.has(theme.id);
+// Une couche est-elle encore réclamée par une présélection active ?
+// (sert à ne pas la désactiver si deux présélections la partagent, ex. « parcs »)
+function layerStillClaimed(layerId) {
+  for (const p of PRESELECTIONS) {
+    if (activePreselections.has(p.id) && p.layers.includes(layerId)) return true;
+  }
+  return false;
+}
+
+// Une présélection agit comme un filtre : plusieurs peuvent être actives
+// (union de leurs couches) ou aucune. Les couches désignées peuvent
+// appartenir à n'importe quelle catégorie du catalogue.
+function togglePreselection(presel) {
+  const already = activePreselections.has(presel.id);
   if (already) {
-    activeThemes.delete(theme.id);
-    // Retire toutes les couches de ce thème
-    for (const def of ALL_LAYERS) {
-      if (def.themeId !== theme.id) continue;
-      const chk = $(`#chk-${def.id}`);
+    activePreselections.delete(presel.id);
+    // Retire les couches de cette présélection, sauf celles encore
+    // réclamées par une autre présélection active.
+    for (const id of presel.layers) {
+      if (layerStillClaimed(id)) continue;
+      const chk = $(`#chk-${id}`);
       if (chk && chk.checked) {
         chk.checked = false;
-        toggleLayer(def, false);
+        toggleLayer(LAYER_BY_ID.get(id), false);
       }
     }
   } else {
-    activeThemes.add(theme.id);
-    // Ajoute les couches par défaut de ce thème sans toucher aux autres
-    for (const def of ALL_LAYERS) {
-      if (def.themeId !== theme.id || !def.defaultOn) continue;
-      const chk = $(`#chk-${def.id}`);
+    activePreselections.add(presel.id);
+    // Active les couches de la présélection sans toucher aux autres
+    for (const id of presel.layers) {
+      const chk = $(`#chk-${id}`);
       if (chk && !chk.checked) {
         chk.checked = true;
-        toggleLayer(def, true);
+        toggleLayer(LAYER_BY_ID.get(id), true);
       }
     }
   }
 
   document.querySelectorAll(".theme-btn").forEach((b) =>
-    b.classList.toggle("active", activeThemes.has(b.dataset.theme))
+    b.classList.toggle("active", activePreselections.has(b.dataset.preselection))
   );
+  // Déplie les catégories du catalogue contenant au moins une couche active.
   document.querySelectorAll(".layer-group").forEach((grp) => {
-    grp.open = activeThemes.has(grp.id.replace("grp-", ""));
+    const catId = grp.id.replace("grp-", "");
+    grp.open = ALL_LAYERS.some((l) => l.categoryId === catId && activeLayers.has(l.id));
   });
   syncSubgroupToggles();
 }
@@ -394,6 +409,7 @@ function buildLayer(def) {
     case "wfs": return buildWfsLayer(def);
     case "velov": return buildVelovLayer(def);
     case "overpass": return buildOverpassLayer(def);
+    case "openagenda": return buildOpenAgendaLayer(def);
     case "vehicles": return buildVehicleLayer(def);
     case "dvf-choropleth": return buildDvfChoropleth(def);
     case "dvf-points": return buildDvfPoints(def);
@@ -412,9 +428,9 @@ function refreshPanels() {
 }
 
 function updateGroupCounts() {
-  THEMES.forEach((t) => {
-    const n = t.layers.filter((l) => activeLayers.has(l.id)).length;
-    const el = $(`#grpcount-${t.id}`);
+  CATALOG.forEach((c) => {
+    const n = c.layers.filter((l) => activeLayers.has(l.id)).length;
+    const el = $(`#grpcount-${c.id}`);
     if (el) el.textContent = n ? `${n} active${n > 1 ? "s" : ""}` : "";
   });
 }
@@ -586,6 +602,52 @@ function extractLineCodes(desserte) {
   return [...codes].sort().join(", ");
 }
 
+// ============================================================
+// Marqueurs : pastille colorée + picto (Font Awesome)
+// ============================================================
+// Couleur d'encre (icône / texte) lisible sur un fond donné
+function contrastInk(color) {
+  const c = String(color).trim();
+  if (c[0] !== "#") return "#fff";
+  let h = c.slice(1);
+  if (h.length === 3) h = h.split("").map((x) => x + x).join("");
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.62 ? "rgba(15,23,42,0.92)" : "#fff";
+}
+
+// Icône Leaflet : pastille `fillColor` portant le picto `def.icon`
+function makePoiIcon(def, fillColor, radius) {
+  const d = Math.round((radius || def.radius || 6.5) * 2 + 9); // diamètre en px
+  const ink = contrastInk(fillColor);
+  const inner = def.icon ? `<i class="fa-solid ${def.icon}" style="color:${ink}"></i>` : "";
+  return L.divIcon({
+    className: "poi-divicon",
+    html: `<span class="poi-pin" style="background:${fillColor};width:${d}px;height:${d}px;font-size:${Math.round(d * 0.46)}px">${inner}</span>`,
+    iconSize: [d, d],
+    iconAnchor: [d / 2, d / 2],
+    popupAnchor: [0, -d / 2]
+  });
+}
+
+// Groupe de clusters teinté selon la nature des points (couleur de la couche)
+function clusterGroup(color, opts = {}) {
+  const ink = contrastInk(color);
+  return L.markerClusterGroup({
+    showCoverageOnHover: false,
+    ...opts,
+    iconCreateFunction: (cluster) => {
+      const n = cluster.getChildCount();
+      const d = n < 10 ? 32 : n < 100 ? 38 : 46;
+      return L.divIcon({
+        className: "poi-cluster-wrap",
+        html: `<div class="poi-cluster" style="background:${color};color:${ink};box-shadow:0 0 0 5px ${color}59;width:${d}px;height:${d}px">${n}</div>`,
+        iconSize: [d, d]
+      });
+    }
+  });
+}
+
 async function buildWfsLayer(def) {
   const resp = await fetch(def.url);
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -654,10 +716,7 @@ async function buildWfsLayer(def) {
       const fillColor = def.stationColorFn
         ? def.stationColorFn(feature.properties, def.color)
         : def.color;
-      const marker = L.circleMarker(latlng, {
-        radius: def.radius || 6.5, color: getCssVar('--marker-stroke'), weight: 1.5,
-        fillColor, fillOpacity: 0.95
-      });
+      const marker = L.marker(latlng, { icon: makePoiIcon(def, fillColor), keyboard: false });
       marker._fillColor = fillColor;
       return marker;
     },
@@ -675,7 +734,7 @@ async function buildWfsLayer(def) {
 
   let result = layer;
   if (def.cluster) {
-    result = L.markerClusterGroup({ disableClusteringAtZoom: 17, showCoverageOnHover: false });
+    result = clusterGroup(def.color, { disableClusteringAtZoom: 17 });
     result.addLayer(layer);
   }
   result._featureCount = features.length;
@@ -698,9 +757,9 @@ async function buildVelovLayer(def) {
     totalStands += stands;
     if (bikes > 0) withBikes++;
     const color = bikes === 0 ? "#f8716a" : bikes < 4 ? "#fbbf24" : "#34d399";
-    const marker = L.circleMarker([s.lat, s.lng], {
-      radius: 6.5, color: getCssVar('--marker-stroke'), weight: 1.5, fillColor: color, fillOpacity: 0.95
-    });
+    const marker = L.marker([s.lat, s.lng], { icon: makePoiIcon(def, color), keyboard: false });
+    marker._fillColor = color;
+    marker._poiColor = color;
     marker._layerDef = def;
     marker._poiProps = { name: s.name?.replace(/^\d+\s*-\s*/, "") || "Station Vélo'v", bikes, stands, address: s.address || "—", source: def.source };
     marker.bindPopup(
@@ -738,9 +797,7 @@ async function buildOverpassLayer(def) {
     if (lat == null) continue;
     points.push([lat, lon]);
     const tags = el.tags || {};
-    const marker = L.circleMarker([lat, lon], {
-      radius: 6.5, color: getCssVar('--marker-stroke'), weight: 1.5, fillColor: def.color, fillOpacity: 0.95
-    });
+    const marker = L.marker([lat, lon], { icon: makePoiIcon(def, def.color), keyboard: false });
     const addr = [tags["addr:housenumber"], tags["addr:street"]].filter(Boolean).join(" ");
     marker._layerDef = def;
     marker._poiProps = { name: tags.name || def.name, address: addr || null, opening_hours: tags.opening_hours || null, phone: tags.phone || null, source: def.source };
@@ -755,7 +812,50 @@ async function buildOverpassLayer(def) {
   }
   let result = group;
   if (def.cluster) {
-    result = L.markerClusterGroup({ disableClusteringAtZoom: 17, showCoverageOnHover: false });
+    result = clusterGroup(def.color, { disableClusteringAtZoom: 17 });
+    result.addLayer(group);
+  }
+  result._featureCount = points.length;
+  result._points = points;
+  return result;
+}
+
+// ---------- Évènements OpenAgenda (Fête de la musique) ----------
+async function buildOpenAgendaLayer(def) {
+  const resp = await fetch(def.url);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const data = await resp.json();
+  const records = data.results || [];
+
+  const group = L.featureGroup();
+  const points = [];
+  for (const r of records) {
+    const c = r.location_coordinates;
+    if (!c || c.lat == null || c.lon == null) continue;
+    points.push([c.lat, c.lon]);
+    const start = r.firstdate_begin ? new Date(r.firstdate_begin) : null;
+    const horaire = start
+      ? start.toLocaleString("fr-FR", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })
+      : null;
+    const props = {
+      titre: r.title_fr || "Évènement",
+      horaire,
+      lieu: r.location_name || null,
+      adresse: r.location_address || null,
+      description: r.location_description_fr || null,
+      url: r.canonicalurl || null,
+      source: def.source
+    };
+    const marker = L.marker([c.lat, c.lon], { icon: makePoiIcon(def, def.color), keyboard: false });
+    marker._layerDef = def;
+    marker._poiProps = props;
+    marker.bindPopup(buildPopup(def, props));
+    group.addLayer(marker);
+  }
+
+  let result = group;
+  if (def.cluster) {
+    result = clusterGroup(def.color, { disableClusteringAtZoom: 18 });
     result.addLayer(group);
   }
   result._featureCount = points.length;
@@ -846,15 +946,16 @@ async function buildDvfChoropleth(def) {
 
 async function buildDvfPoints(def) {
   const salesByArrond = await loadDvfData();
-  const cluster = L.markerClusterGroup({ disableClusteringAtZoom: 18, showCoverageOnHover: false });
+  const cluster = clusterGroup(def.color, { disableClusteringAtZoom: 18 });
   const points = [];
   for (const sales of Object.values(salesByArrond)) {
     for (const s of sales) {
       if (!s.lat || !s.lon) continue;
       points.push([s.lat, s.lon]);
-      const marker = L.circleMarker([s.lat, s.lon], {
-        radius: 5.5, color: getCssVar('--marker-stroke'), weight: 1, fillColor: dvfColor(s.ppm2), fillOpacity: 0.92
-      });
+      const fillColor = dvfColor(s.ppm2);
+      const marker = L.marker([s.lat, s.lon], { icon: makePoiIcon(def, fillColor, 5.5), keyboard: false });
+      marker._fillColor = fillColor;
+      marker._poiColor = fillColor;
       marker._layerDef = def;
       marker._poiProps = { title: `Appartement ${s.rooms ? s.rooms + " pièce(s), " : ""}${Math.round(s.surface)} m²`, price: s.price, ppm2: s.ppm2, surface: s.surface, rooms: s.rooms, date: s.date, source: def.source };
       marker.bindPopup(
@@ -1220,24 +1321,6 @@ function updateZoneStyles() {
 // Synthèse (KPI + graphiques + focus zone)
 // ============================================================
 const rightPanel = $("#right-panel");
-const rightPanelToggle = $("#right-panel-toggle");
-let rightPanelManuallyClosed = false;
-
-$("#right-panel-close").addEventListener("click", () => {
-  rightPanel.classList.add("right-panel--collapsed");
-  rightPanelManuallyClosed = true;
-  rightPanelToggle.hidden = false;
-  // Pas d'invalidateSize ici : la transition CSS vient de commencer,
-  // un appel trop tôt met en cache une taille intermédiaire et fausse
-  // le décalage calculé par invalidateSize(pan:true) au transitionend.
-});
-
-$("#right-panel-toggle").addEventListener("click", () => {
-  rightPanel.classList.remove("right-panel--collapsed");
-  rightPanelManuallyClosed = false;
-  rightPanelToggle.hidden = true;
-  // Idem : on laisse transitionend gérer invalidateSize
-});
 
 rightPanel.addEventListener("transitionend", (e) => {
   if (e.propertyName === "width" || e.propertyName === "transform") {
@@ -1251,12 +1334,10 @@ function updateInsights() {
   const div = $("#insights");
   if (activeLayers.size === 0 && !selectedPoi) {
     rightPanel.hidden = true;
-    rightPanelToggle.hidden = true;
-    rightPanelManuallyClosed = false;
     div.innerHTML = "";
     return;
   }
-  // Panneau pas encore visible → l'ouvrir avec animation
+  // Panneau pas encore visible → l'afficher avec animation
   if (rightPanel.hidden) {
     rightPanel.hidden = false;
     rightPanel.style.width = "0";
@@ -1269,16 +1350,6 @@ function updateInsights() {
     // Fallback : transitionend peut ne pas se déclencher quand
     // le panneau passe de display:none à visible.
     setTimeout(() => map.invalidateSize(), 400);
-  }
-  // Si un POI est sélectionné, forcer l'ouverture du panneau
-  if (selectedPoi) {
-    rightPanel.classList.remove("right-panel--collapsed");
-    rightPanelToggle.hidden = true;
-  } else if (rightPanelManuallyClosed) {
-    rightPanelToggle.hidden = false;
-  } else {
-    rightPanel.classList.remove("right-panel--collapsed");
-    rightPanelToggle.hidden = true;
   }
 
   let html = "";
@@ -1511,8 +1582,8 @@ function updateLegend() {
 $("#btn-sources").addEventListener("click", () => $("#sources-dialog").showModal());
 
 // ---------- Démarrage : présélection Canicule active par défaut ----------
-const CANICULE_THEME = THEMES.find((t) => t.id === "canicule");
-if (CANICULE_THEME) toggleTheme(CANICULE_THEME);
+const CANICULE_PRESELECTION = PRESELECTIONS.find((p) => p.id === "canicule");
+if (CANICULE_PRESELECTION) togglePreselection(CANICULE_PRESELECTION);
 
 // ---------- Compteur de visites ----------
 (async function updateVisitCounter() {

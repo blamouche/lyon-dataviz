@@ -63,7 +63,6 @@
     </aside>
 
     <main class="map-wrap">
-      <button class="right-panel-toggle" id="right-panel-toggle" hidden title="Ouvrir la synthèse">📊</button>
       <div id="map"></div>
       <div id="status" class="status" hidden></div>
       <div class="map-statusbar">
@@ -76,7 +75,6 @@
     <aside class="right-panel" id="right-panel" hidden>
       <div class="right-panel-header">
         <h2>Synthèse</h2>
-        <button class="right-panel-close" id="right-panel-close" title="Fermer">✕</button>
       </div>
       <div class="right-panel-body" id="insights"></div>
     </aside>
@@ -93,6 +91,7 @@
       <li><strong>Commissariats, casernes, pharmacies</strong> : © contributeurs <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> via Overpass API</li>
       <li><strong>Qualité de l'air</strong> : indice ATMO quotidien par commune, <a href="https://www.atmo-france.org" target="_blank" rel="noopener">Atmo France</a> / <a href="https://www.atmo-auvergnerhonealpes.fr" target="_blank" rel="noopener">Atmo Auvergne-Rhône-Alpes</a> — flux WFS national en direct (ODbL)</li>
       <li><strong>Contrôle de l'eau potable</strong> : résultats du contrôle sanitaire (ARS / Ministère de la Santé) via l'API <a href="https://hubeau.eaufrance.fr" target="_blank" rel="noopener">Hub'Eau</a> — en direct. Contours communaux : Métropole de Lyon / data.grandlyon.com</li>
+      <li><strong>Fête de la musique</strong> : programmation publiée sur <a href="https://openagenda.com" target="_blank" rel="noopener">OpenAgenda</a> (agenda national du Ministère de la Culture), via le jeu de données « Évènements publics OpenAgenda » d'<a href="https://public.opendatasoft.com/explore/dataset/evenements-publics-openagenda/" target="_blank" rel="noopener">OpenDataSoft</a> — en direct (licence ouverte)</li>
     </ul>
     <p class="hint">Sauf mention contraire, les couches sont chargées en direct depuis les services ouverts et reflètent la dernière version publiée.</p>
     <form method="dialog"><button class="btn-primary">Fermer</button></form>
@@ -106,6 +105,6 @@
   <script src="data/tcl-schedule.js"></script>
   <script src="js/config.js"></script>
   <script src="js/vehicles.js"></script>
-  <script src="js/app.js?v=3"></script>
+  <script src="js/app.js?v=7"></script>
 </body>
 </html>
