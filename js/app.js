@@ -90,6 +90,11 @@ function getStoredBasemap() {
   return BASEMAP_OPTIONS[raw] ? raw : "dark";
 }
 let currentBasemap = getStoredBasemap();
+// Par défaut, le fond de carte démarre en mode clair, indépendamment du thème UI.
+if (!localStorage.getItem(BASEMAP_KEY)) {
+  currentBasemap = "light";
+  localStorage.setItem(BASEMAP_KEY, currentBasemap);
+}
 BASEMAP_OPTIONS[currentBasemap].tiles.addTo(map);
 
 const themeBtn = document.getElementById("btn-theme");
