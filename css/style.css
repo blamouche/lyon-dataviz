@@ -780,25 +780,7 @@ body { display: flex; flex-direction: column; }
   color: var(--ink-soft);
 }
 
-.btn-locate {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  margin-left: 0.3rem;
-  padding: 0.25rem 0.65rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--panel-2);
-  color: var(--ink);
-  font-family: inherit;
-  font-size: 0.64rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  cursor: pointer;
-  transition: border-color 0.12s, color 0.12s, background 0.12s;
-}
-.btn-locate:hover { border-color: var(--accent); color: var(--accent); background: var(--panel); }
-.btn-locate i { font-size: 0.72rem; }
+.btn-locate i { font-size: 0.78rem; }
 
 .locate-marker { background: transparent; border: none; }
 .locate-dot {
