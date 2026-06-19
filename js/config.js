@@ -571,18 +571,11 @@ const PRESELECTIONS = [
     layers: ["ecoles", "colleges", "lycees"]
   },
   {
-    id: "securite",
-    label: "Sécurité & santé",
-    emoji: "🛡️",
-    hint: "Délinquance, commissariats, pompiers et hôpitaux.",
-    layers: ["delinquance", "police", "pompiers", "hopitaux"]
-  },
-  {
     id: "qualite",
     label: "Qualité de vie",
     emoji: "🌳",
-    hint: "Parcs, marchés et piscines.",
-    layers: ["parcs", "marches", "piscines"]
+    hint: "Parcs, plans d'eau et marchés.",
+    layers: ["parcs", "plans-eau", "marches"]
   },
   {
     id: "velo",
@@ -590,6 +583,20 @@ const PRESELECTIONS = [
     emoji: "🚲",
     hint: "Stations Vélo'v en temps réel et aménagements cyclables.",
     layers: ["velov", "cyclable"]
+  },
+  {
+    id: "securite",
+    label: "Sécurité",
+    emoji: "🛡️",
+    hint: "Délinquance par arrondissement et commissariats de police.",
+    layers: ["delinquance", "police"]
+  },
+  {
+    id: "sante",
+    label: "Santé",
+    emoji: "🏥",
+    hint: "Hôpitaux, cliniques, pharmacies, défibrillateurs et casernes de pompiers.",
+    layers: ["hopitaux", "pharmacies", "defib", "pompiers"]
   },
   {
     id: "qualite-environnementale",

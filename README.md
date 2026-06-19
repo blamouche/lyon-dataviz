@@ -20,7 +20,8 @@ combinées).
 recherche, sous-rubriques et case maîtresse pour activer/désactiver plusieurs
 couches d'un coup.
 3. **Synthèse** — KPIs calculés côté client, graphiques en barres CSS, fiche du
-POI cliqué et détail d'une zone d'analyse sélectionnée.
+POI cliqué, détail d'une zone d'analyse sélectionnée et graphique d'évolution
+de la délinquance par arrondissement.
 
 ## Présélections thématiques
 
@@ -28,11 +29,13 @@ POI cliqué et détail d'une zone d'analyse sélectionnée.
 |---|---|
 | 🌡️ **Canicule** | parcs, plans d'eau, cours d'eau, fontaines d'eau potable, piscines, musées |
 | 🎶 **Fête de la musique 2026** | programmation OpenAgenda du 21 juin 2026 |
-| 🚇 **Transports** | métro & funiculaire, stations, tramway, Vélo'v temps réel |
+| 🚇 **Transports en commun** | métro & funiculaire, stations, tramway, positions théoriques, lignes de bus |
 | 🏠 **Logement** | prix médian au m² des appartements (DVF 2024) |
 | 🎓 **Éducation & famille** | écoles, collèges, lycées |
-| 🛡️ **Sécurité & santé** | délinquance par arrondissement, commissariats, pompiers, hôpitaux |
-| 🌳 **Qualité de vie** | parcs, marchés, piscines |
+| 🛡️ **Sécurité** | délinquance par arrondissement, commissariats de police |
+| 🏥 **Santé** | hôpitaux, pharmacies, défibrillateurs, casernes de pompiers |
+| 🌳 **Qualité de vie** | parcs, plans d'eau, marchés |
+| 🚲 **Vélo** | stations Vélo'v temps réel, aménagements cyclables |
 | 🌍 **Qualité environnementale** | indice ATMO du jour, contrôle sanitaire de l'eau potable |
 
 ## Catalogue de données
@@ -72,7 +75,7 @@ js/vehicles.js        Positions théoriques animées des métros et trams TCL
 scripts/build_dvf.py         Préparation annuelle des données DVF
 data/dvf-2024.js             Ventes immobilières pré-filtrées (window.DVF_DATA)
 scripts/build_delinquance.py Préparation annuelle des données SSMSI
-data/delinquance-2025.js     Statistiques de délinquance par arrondissement (window.DELINQUANCE_DATA)
+data/delinquance.js          Statistiques de délinquance par arrondissement et par année (window.DELINQUANCE_DATA)
 data/tcl-schedule.js         Fréquences théoriques TCL pour l'animation des véhicules
 ```
 
@@ -126,9 +129,12 @@ python3 scripts/build_delinquance.py
 ```
 
 Le script télécharge la base communale SSMSI (~38 Mo compressé), filtre les 9
-arrondissements de Lyon sur la dernière année disponible et écrit
-`data/delinquance-<année>.js` (`window.DELINQUANCE_DATA`). À relancer à chaque
-nouveau millésime, puis adapter le nom du fichier dans `index.html`.
+arrondissements de Lyon sur toutes les années disponibles et écrit
+`data/delinquance.js` (`window.DELINQUANCE_DATA`). Le fichier contient l'historique
+2016‑2025 ; la dernière année reste celle affichée par défaut sur la carte et dans
+les KPI. Lorsqu'un arrondissement est sélectionné dans l'analyse par zone, un
+graphique d'évolution du taux pour l'indicateur courant s'affiche dans la synthèse.
+À relancer à chaque nouveau millésime.
 
 ## Ajouter une couche
 

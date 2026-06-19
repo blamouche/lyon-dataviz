@@ -804,9 +804,10 @@ function ficheCrime(p) {
   rows += fRow("Millésime", data?.meta?.year);
   html += fSection("Synthèse", rows);
   // Détail par type de faits
-  if (a?.data) {
+  const yearData = a?.years?.[data?.meta?.year];
+  if (yearData) {
     const items = data.indicateurs
-      .map((ind) => ({ ind, v: a.data[ind] ? a.data[ind][0] : null }))
+      .map((ind) => ({ ind, v: yearData[ind] ? yearData[ind][1] : null }))
       .filter((x) => x.v != null).sort((x, y) => y.v - x.v);
     let det = "";
     for (const { ind, v } of items) det += fRow(ind, v.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " ‰", { mono: true });
@@ -1341,34 +1342,44 @@ async function buildDvfPoints(def) {
 // ---------- Délinquance (SSMSI) ----------
 const CRIME_COLORS = ["#ede9fe", "#c4b5fd", "#a78bfa", "#8b5cf6", "#6d28d9"];
 
-function crimeRate(insee, indicator) {
+function crimeRateForYear(insee, indicator, year) {
   const a = window.DELINQUANCE_DATA?.arrondissements?.[insee];
-  if (!a) return null;
+  if (!a || !year) return null;
+  const y = a.years?.[year];
+  if (!y) return null;
   if (indicator === "__all__") {
     let totalCount = 0;
     for (const ind of window.DELINQUANCE_DATA.indicateurs) {
-      const v = a.data?.[ind];
+      const v = y[ind];
       if (v) totalCount += v[0];
     }
     const pop = a.pop;
     return (totalCount && pop) ? (totalCount / pop) * 1000 : null;
   }
-  const v = a.data?.[indicator];
+  const v = y[indicator];
   return v ? v[1] : null; // taux pour mille
 }
-function crimeCount(insee, indicator) {
+function crimeCountForYear(insee, indicator, year) {
   const a = window.DELINQUANCE_DATA?.arrondissements?.[insee];
-  if (!a) return null;
+  if (!a || !year) return null;
+  const y = a.years?.[year];
+  if (!y) return null;
   if (indicator === "__all__") {
     let total = 0;
     for (const ind of window.DELINQUANCE_DATA.indicateurs) {
-      const v = a.data?.[ind];
+      const v = y[ind];
       if (v) total += v[0];
     }
     return total || null;
   }
-  const v = a.data?.[indicator];
+  const v = y[indicator];
   return v ? v[0] : null;
+}
+function crimeRate(insee, indicator) {
+  return crimeRateForYear(insee, indicator, window.DELINQUANCE_DATA?.meta?.year);
+}
+function crimeCount(insee, indicator) {
+  return crimeCountForYear(insee, indicator, window.DELINQUANCE_DATA?.meta?.year);
 }
 
 // Bornes de classes (5 classes linéaires entre min et max des 9 arrondissements)
@@ -1384,7 +1395,7 @@ function crimeColor(rate, breaks) {
 }
 
 async function buildCrimeLayer(def) {
-  if (!window.DELINQUANCE_DATA) throw new Error("data/delinquance-2025.js introuvable");
+  if (!window.DELINQUANCE_DATA) throw new Error("data/delinquance.js introuvable");
   const arrondBase = await getArrondGeojson();
   const breaks = crimeBreaks(crimeIndicator);
 
@@ -1857,6 +1868,27 @@ function updateInsights() {
         <div class="zone-row total"><span class="zr-name">Total objets dans la zone</span>
           <span class="zr-val">${total.toLocaleString("fr-FR")}</span></div>
       </div>`;
+
+      // Graphique d'évolution de la délinquance pour l'arrondissement sélectionné
+      if (zoneState.level === "arrond" && activeLayers.has("delinquance") && window.DELINQUANCE_DATA) {
+        const insee = zoneState.selectedId;
+        const years = window.DELINQUANCE_DATA.meta.years;
+        const evol = years
+          .map((y) => ({ year: y, rate: crimeRateForYear(insee, crimeIndicator, y) }))
+          .filter((d) => d.rate != null);
+        if (evol.length > 1) {
+          const max = Math.max(...evol.map((d) => d.rate));
+          const chartLabel = crimeIndicator === "__all__" ? "Tous les faits" : crimeIndicator;
+          html += `<div class="chart">
+            <div class="chart-title">Évolution · ${chartLabel} · taux ‰</div>` +
+            evol.map((d) =>
+              `<div class="bar-row">
+                 <span class="bar-label">${d.year}</span>
+                 <span class="bar-track"><span class="bar-fill crime" style="width:${Math.round((d.rate / max) * 100)}%"></span></span>
+                 <span class="bar-value">${d.rate.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} ‰</span>
+               </div>`).join("") + `</div>`;
+        }
+      }
     }
   }
 

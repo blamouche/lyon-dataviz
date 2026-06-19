@@ -5,7 +5,7 @@
 | **Produit** | Lyon Data — plateforme d'exploration des données ouvertes de la ville de Lyon |
 | **Version du document** | 1.2 |
 | **Date** | 19 juin 2026 |
-| **Statut** | V1.2 livrée (catalogue de données + présélections + analyse par zone) |
+| **Statut** | V1.2 livrée (catalogue de données + présélections + analyse par zone + évolution délinquance) |
 
 ---
 
@@ -57,8 +57,9 @@ couches piochées n'importe où dans le catalogue ; une même couche peut appart
 ## 4. Périmètre fonctionnel — V1.2 (livrée)
 
 ### 4.1 Carte
-- Fond de carte **sombre** par défaut (CARTO Dark Matter), bascule vers un fond
-  clair (Positron) en un clic. Le choix est persistant dans `localStorage`.
+- Fond de carte **clair** par défaut (CARTO Positron), bascule vers un fond
+  sombre (Dark Matter), Voyager ou satellite en un clic. Le choix est persistant
+  dans `localStorage`.
 - Centrage initial sur Lyon, zoom libre (min. 12), légende dynamique, infobulles au clic.
 - Regroupement automatique des points denses (clustering) sur les couches configurées.
 - **Barre d'état cartographique** : coordonnées du curseur, niveau de zoom, total d'objets affichés ; échelle métrique Leaflet.
@@ -74,11 +75,13 @@ présélections reste active tant qu'au moins une la réclame.
 |---|---|
 | 🌡️ Canicule | Parcs, plans d'eau, cours d'eau, fontaines, piscines, musées |
 | 🎶 Fête de la musique 2026 | Programmation OpenAgenda |
-| 🚇 Transports | Métro & funiculaire, stations, tramway, Vélo'v temps réel |
+| 🚇 Transports en commun | Métro & funiculaire, stations, tramway, positions théoriques, lignes de bus |
 | 🏠 Logement | Prix médian DVF par arrondissement |
 | 🎓 Éducation & famille | Écoles, collèges, lycées |
-| 🛡️ Sécurité & santé | Délinquance, commissariats, pompiers, hôpitaux |
-| 🌳 Qualité de vie | Parcs, marchés, piscines |
+| 🛡️ Sécurité | Délinquance par arrondissement, commissariats de police |
+| 🏥 Santé | Hôpitaux, pharmacies, défibrillateurs, casernes de pompiers |
+| 🌳 Qualité de vie | Parcs, plans d'eau, marchés |
+| 🚲 Vélo | Stations Vélo'v temps réel, aménagements cyclables |
 | 🌍 Qualité environnementale | Indice ATMO, eau potable |
 
 La présélection **Canicule** est active par défaut au démarrage.
@@ -106,7 +109,8 @@ Option « Agréger les données par zone » dans le panneau latéral.
 - Étiquettes de comptage superposées sur la carte.
 - Clic sur une zone : affichage du détail dans le panneau Synthèse (nombre
 d'objets par couche active + indicateurs propres aux arrondissements : prix
-médian DVF, taux de délinquance).
+médian DVF, taux de délinquance + graphique d'évolution sur les années
+disponibles).
 - Déselection possible via le bouton ✕ ou un second clic sur la zone.
 
 ### 4.5 Panneau « Synthèse »
@@ -119,7 +123,8 @@ Contenus possibles :
   Vélo'v, évènement OpenAgenda, Overpass, véhicule TCL, vente DVF,
   choroplèthe DVF, délinquance, eau potable, ATMO).
 - **Focus zone** : nom de la zone + répartition des objets par couche active +
-  indicateurs DVF/délinquance si disponibles.
+  indicateurs DVF/délinquance si disponibles ; pour un arrondissement, graphique
+  d'évolution du taux de délinquance par année.
 - **Cartes KPI** : indicateurs mis en avant selon les couches actives :
   - Vélo'v : vélos disponibles et % de stations approvisionnées.
   - DVF : prix médian ville et nombre de ventes analysées.
@@ -128,7 +133,8 @@ Contenus possibles :
   - Eau : taux de prélèvements conformes sur 6 mois.
   - Autres couches : nombre d'objets affichés.
 - **Graphiques en barres CSS** : prix médian au m² par arrondissement ; taux de
-délinquance par arrondissement pour l'indicateur sélectionné.
+délinquance par arrondissement pour l'indicateur sélectionné ; évolution
+du taux de délinquance pour l'arrondissement sélectionné.
 
 ### 4.6 Sources de données
 
@@ -137,7 +143,7 @@ délinquance par arrondissement pour l'indicateur sélectionné.
 | data.grandlyon.com (Métropole, Ville de Lyon, SYTRAL) | Flux WFS GeoJSON, en direct | Transports, parcs, marchés, équipements, éducation, communes, arrondissements, quartiers… |
 | Vélo'v / JCDecaux via data.grandlyon.com | API JSON temps réel | Disponibilité des stations |
 | data.gouv.fr — DVF géolocalisées (DGFiP/Etalab) | **Pré-compilées** (`scripts/build_dvf.py`) | Prix immobiliers |
-| SSMSI (min. Intérieur) / data.gouv.fr | **Pré-compilées** (`scripts/build_delinquance.py`) | Délinquance par arrondissement |
+| SSMSI (min. Intérieur) / data.gouv.fr | **Pré-compilées** (`scripts/build_delinquance.py`) | Délinquance par arrondissement, historique 2016‑2025 |
 | OpenStreetMap via API Overpass | Requêtes en direct | Commissariats, pompiers, pharmacies |
 | Atmo France / Atmo Auvergne-Rhône-Alpes | Flux WFS national, en direct | Indice ATMO quotidien par commune |
 | Hub'Eau (ARS / Min. Santé) | API JSON, en direct | Contrôle sanitaire de l'eau potable par commune |
@@ -153,13 +159,17 @@ délinquance par arrondissement pour l'indicateur sélectionné.
 - **Sélecteur d'indicateur de délinquance** : dans le catalogue, la couche
   « Délinquance » offre un menu déroulant pour choisir le type de faits ou
   visualiser l'agrégat de tous les faits.
-- **Thème clair/sombre persistant** : bascule du thème UI et du fond de carte
-  en un clic, mémorisé dans `localStorage`.
+- **Sélecteur de fond de carte** : bascule entre sombre, clair, Voyager et satellite,
+  persistant dans `localStorage`.
+- **Géolocalisation utilisateur** : bouton « Localiser » centrant la carte sur la
+  position de l'utilisateur avec un marqueur.
+- **Thème clair/sombre persistant** : bascule du thème UI en un clic, mémorisé
+  dans `localStorage`.
 
 ### 4.8 Hors périmètre V1.2
 - Pas de compte utilisateur, pas de sauvegarde de configuration côté serveur.
 - Pas d'export (image, CSV) ni de partage par URL.
-- Pas de géolocalisation utilisateur ni d'isochrones.
+- Pas d'isochrones.
 - Les positions des véhicules TCL sont théoriques (fréquences + horaires), pas de
   suivi GPS temps réel.
 
@@ -199,7 +209,7 @@ js/vehicles.js         Animation des positions théoriques TCL
 scripts/build_dvf.py   Préparation annuelle des prix immobiliers
 data/dvf-2024.js       Ventes pré-filtrées (5 914+ ventes d'appartements 2024)
 scripts/build_delinquance.py  Préparation annuelle des statistiques SSMSI
-data/delinquance-2025.js      Faits par arrondissement, taux pour 1 000 hab.
+data/delinquance.js           Faits par arrondissement et par année (2016‑2025), taux pour 1 000 hab.
 data/tcl-schedule.js   Fréquences théoriques TCL pour l'animation des véhicules
 ```
 

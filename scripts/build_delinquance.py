@@ -4,15 +4,14 @@
 Source : « Base statistique communale de la délinquance enregistrée par la
 police et la gendarmerie nationales » (SSMSI, ministère de l'Intérieur),
 diffusée sur data.gouv.fr. Le fichier national (~38 Mo compressé) est filtré
-sur les 9 arrondissements de Lyon et la dernière année disponible, puis écrit
-en JS compact (data/delinquance-<année>.js) chargé via une balise <script>.
+sur les 9 arrondissements de Lyon et sur toutes les années disponibles,
+puis écrit en JS compact (data/delinquance.js) chargé via une balise <script>.
 
 Usage :
     python3 scripts/build_delinquance.py [chemin/vers/fichier.csv.gz]
 
 Sans argument, le fichier est téléchargé depuis data.gouv.fr (long).
-À relancer chaque année à la publication du nouveau millésime, puis adapter
-le nom du fichier dans index.html.
+À relancer chaque année à la publication du nouveau millésime.
 """
 import csv
 import gzip
@@ -64,18 +63,19 @@ def main():
     if not rows:
         raise SystemExit("Aucune ligne trouvée pour les arrondissements de Lyon")
 
-    year = max(int(r["annee"]) for _, r in rows)
-    print(f"{len(rows)} lignes Lyon, dernière année : {year}")
+    years = sorted({int(r["annee"]) for _, r in rows})
+    latest = years[-1]
+    print(f"{len(rows)} lignes Lyon · années : {years[0]}–{latest}")
 
     indicateurs = []
     arrond = {}
     for code, r in rows:
-        if int(r["annee"]) != year:
-            continue
+        year = int(r["annee"])
         ind = r["indicateur"]
         if ind not in indicateurs:
             indicateurs.append(ind)
-        a = arrond.setdefault(code, {"pop": int(r["insee_pop"] or 0), "data": {}})
+        a = arrond.setdefault(code, {"pop": int(r["insee_pop"] or 0), "years": {}})
+        year_data = a["years"].setdefault(year, {})
         nombre = parse_float(r["nombre"])
         taux = parse_float(r["taux_pour_mille"])
         # Indicateurs non diffusés (secret statistique) : valeurs interpolées
@@ -83,15 +83,16 @@ def main():
         if taux is None:
             nombre = parse_float(r["complement_info_nombre"])
             taux = parse_float(r["complement_info_taux"])
-        a["data"][ind] = [
+        year_data[ind] = [
             round(nombre) if nombre is not None else None,
             round(taux, 2) if taux is not None else None,
         ]
 
-    out = DATA_DIR / f"delinquance-{year}.js"
+    out = DATA_DIR / "delinquance.js"
     data = {
         "meta": {
-            "year": year,
+            "year": latest,
+            "years": years,
             "source": "SSMSI (ministère de l'Intérieur) / data.gouv.fr",
             "note": "Faits enregistrés par la police et la gendarmerie ; taux pour 1 000 habitants",
         },
@@ -105,7 +106,7 @@ def main():
         f"window.DELINQUANCE_DATA = {payload};\n",
         encoding="utf-8",
     )
-    print(f"OK — {len(arrond)} arrondissements × {len(indicateurs)} indicateurs → {out}")
+    print(f"OK — {len(arrond)} arrondissements × {len(indicateurs)} indicateurs × {len(years)} années → {out}")
 
 
 if __name__ == "__main__":
