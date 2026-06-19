@@ -30,23 +30,22 @@
     </div>
   </header>
 
+  <div class="theme-bar" title="Cliquez pour ajouter ou retirer un jeu de couches. Plusieurs thèmes peuvent être combinés, ou aucun.">
+    <div class="theme-bar-label">Présélections thématiques</div>
+    <div class="theme-grid" id="theme-grid"></div>
+  </div>
+
   <div class="layout">
     <aside class="sidebar" id="sidebar">
-      <section class="panel themes">
-        <h2><span class="step">01</span> Présélections thématiques</h2>
-        <p class="hint">Cliquez pour ajouter ou retirer un jeu de couches. Plusieurs thèmes peuvent être combinés, ou aucun. Vous pouvez ensuite affiner librement les couches dans le catalogue ci-dessous.</p>
-        <div class="theme-grid" id="theme-grid"></div>
-      </section>
-
       <section class="panel layers" id="layers-section">
-        <h2><span class="step">02</span> Catalogue de données</h2>
+        <h2>Catalogue de données</h2>
         <input type="search" id="layer-search" class="search-input"
                placeholder="Filtrer les jeux de données…" autocomplete="off">
         <div id="layer-catalog"></div>
       </section>
 
       <section class="panel zones" id="zones-section">
-        <h2><span class="step">03</span> Analyse par zone</h2>
+        <h2>Analyse par zone</h2>
         <label class="zone-toggle">
           <input type="checkbox" id="zone-toggle">
           <span>Agréger les données par zone</span>
@@ -76,7 +75,7 @@
 
     <aside class="right-panel" id="right-panel" hidden>
       <div class="right-panel-header">
-        <h2><span class="step">04</span> Synthèse</h2>
+        <h2>Synthèse</h2>
         <button class="right-panel-close" id="right-panel-close" title="Fermer">✕</button>
       </div>
       <div class="right-panel-body" id="insights"></div>
