@@ -1870,6 +1870,43 @@ function updateLegend() {
   div.innerHTML = html;
 }
 
+// ---------- Géolocalisation ----------
+let locateMarker = null;
+const LOCATE_ZOOM = 17;
+
+function createLocateMarker(lat, lng) {
+  const color = "#2dd4bf";
+  const icon = L.divIcon({
+    className: "locate-marker",
+    html: `<span class="locate-dot" style="background:${color};box-shadow:0 0 0 4px ${color}44"></span>`,
+    iconSize: [12, 12],
+    iconAnchor: [6, 6]
+  });
+  return L.marker([lat, lng], { icon, zIndexOffset: 1000 }).bindPopup("Votre position").addTo(map);
+}
+
+$("#btn-locate")?.addEventListener("click", () => {
+  if (!navigator.geolocation) {
+    showStatus("Géolocalisation non supportée par ce navigateur.", true);
+    return;
+  }
+  showStatus("Localisation en cours…");
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const { latitude: lat, longitude: lng } = pos.coords;
+      hideStatus();
+      map.setView([lat, lng], LOCATE_ZOOM);
+      if (locateMarker) map.removeLayer(locateMarker);
+      locateMarker = createLocateMarker(lat, lng);
+    },
+    (err) => {
+      console.error("Géolocalisation refusée ou indisponible", err);
+      showStatus("Impossible d'accéder à votre position. Vérifiez les permissions.", true);
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  );
+});
+
 // ---------- Dialog sources ----------
 $("#btn-sources").addEventListener("click", () => $("#sources-dialog").showModal());
 
