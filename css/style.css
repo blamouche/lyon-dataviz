@@ -1,25 +1,49 @@
 /* ============================================================
-   Lyon Data — thème sombre aux couleurs de Lyon
+   Lyon Data — thèmes clair & sombre aux couleurs de Lyon
    Identité : bleu #003594 + rouge #EF3340 (Ville de Lyon)
    Typographies : Inter (texte) + JetBrains Mono (valeurs)
+   Thème par défaut : clair (data-theme="light")
    ============================================================ */
+
+/* ---------- Palette partagée ---------- */
 :root {
+  --accent: #EF3340;             /* rouge Ville de Lyon */
+  --accent-dim: rgba(239, 51, 64, 0.10);
+  --lyon-blue: #003594;          /* bleu Ville de Lyon */
+  --lyon-blue-bright: #1a5fc4;   /* bleu Lyon interactif */
+  --lyon-blue-dim: rgba(0, 53, 148, 0.15);
+  --radius: 10px;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 15px;
+}
+
+/* ---------- Thème clair (défaut) ---------- */
+:root,
+[data-theme="light"] {
+  --bg: #f5f7fa;
+  --panel: #ffffff;
+  --panel-2: #f0f3f7;
+  --ink: #111827;
+  --ink-soft: #4b5563;
+  --ink-faint: #9ca3af;
+  --border: #dbe0e6;
+  --shadow: 0 4px 18px rgba(0, 0, 0, 0.12);
+  --marker-stroke: #ffffff;
+  --map-status-bg: rgba(255, 255, 255, 0.88);
+}
+
+/* ---------- Thème sombre ---------- */
+[data-theme="dark"] {
   --bg: #080c18;
   --panel: #0d1326;
   --panel-2: #141c35;
   --ink: #e4e9f2;
   --ink-soft: #7e8ca2;
   --ink-faint: #3e4d66;
-  --accent: #EF3340;             /* rouge Ville de Lyon */
-  --accent-dim: rgba(239, 51, 64, 0.10);
-  --lyon-blue: #003594;          /* bleu Ville de Lyon */
-  --lyon-blue-bright: #1a5fc4;   /* bleu Lyon interactif */
-  --lyon-blue-dim: rgba(0, 53, 148, 0.15);
   --border: #1a2440;
-  --radius: 10px;
   --shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
-  --mono: "JetBrains Mono", ui-monospace, monospace;
-  font-size: 15px;
+  --marker-stroke: #0d1117;
+  --map-status-bg: rgba(13, 17, 23, 0.85);
 }
 
 * { box-sizing: border-box; }
@@ -371,6 +395,9 @@ body { display: flex; flex-direction: column; }
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
+  box-shadow: 0 0 6px rgba(0,0,0,0.12);
+}
+[data-theme="dark"] .poi-dot {
   box-shadow: 0 0 6px rgba(255,255,255,0.12);
 }
 .poi-title {
@@ -408,7 +435,10 @@ body { display: flex; flex-direction: column; }
   gap: 0.5rem;
   font-size: 0.76rem;
   padding: 0.18rem 0;
-  border-bottom: 1px solid rgba(35, 46, 59, 0.5);
+  border-bottom: 1px solid rgba(127, 127, 127, 0.18);
+}
+[data-theme="dark"] .poi-row {
+  border-bottom-color: rgba(35, 46, 59, 0.5);
 }
 .poi-row:last-of-type { border-bottom: none; }
 .poi-k { color: var(--ink-soft); flex-shrink: 0; }
@@ -450,6 +480,9 @@ body { display: flex; flex-direction: column; }
   border-radius: 50%;
   margin-top: 0.22rem;
   flex-shrink: 0;
+  box-shadow: 0 0 6px rgba(0,0,0,0.12);
+}
+[data-theme="dark"] .layer-swatch {
   box-shadow: 0 0 6px rgba(255,255,255,0.12);
 }
 .layer-swatch.line { border-radius: 2px; height: 5px; margin-top: 0.42rem; }
@@ -686,7 +719,9 @@ body { display: flex; flex-direction: column; }
   display: flex;
   gap: 1.1rem;
   padding: 0.3rem 0.9rem;
-  background: rgba(13, 17, 23, 0.85);
+  background: var(--map-status-bg);
+  border-top: 1px solid var(--border);
+  border-left: 1px solid var(--border);
   border-top-left-radius: 8px;
   backdrop-filter: blur(4px);
   font-size: 0.64rem;
@@ -694,7 +729,7 @@ body { display: flex; flex-direction: column; }
   color: var(--ink-soft);
 }
 
-/* Contrôles Leaflet en sombre */
+/* Contrôles Leaflet */
 .leaflet-bar a {
   background: var(--panel-2) !important;
   color: var(--ink) !important;
@@ -702,14 +737,14 @@ body { display: flex; flex-direction: column; }
 }
 .leaflet-bar a:hover { background: var(--panel) !important; color: var(--accent) !important; }
 .leaflet-control-scale-line {
-  background: rgba(13, 17, 23, 0.7) !important;
+  background: var(--map-status-bg) !important;
   color: var(--ink-soft) !important;
-  border-color: var(--ink-faint) !important;
+  border-color: var(--border) !important;
   font-family: var(--mono);
   font-size: 0.6rem !important;
 }
 .leaflet-control-attribution {
-  background: rgba(13, 17, 23, 0.75) !important;
+  background: var(--map-status-bg) !important;
   color: var(--ink-faint) !important;
   font-size: 0.62rem !important;
 }
@@ -763,12 +798,12 @@ body { display: flex; flex-direction: column; }
   letter-spacing: 0.06em;
 }
 
-/* Clusters sombres */
+/* Clusters */
 .marker-cluster-small, .marker-cluster-medium, .marker-cluster-large {
   background-color: rgba(239, 51, 64, 0.25) !important;
 }
 .marker-cluster-small div, .marker-cluster-medium div, .marker-cluster-large div {
-  background-color: rgba(239, 51, 64, 0.75) !important;
+  background-color: rgba(239, 51, 64, 0.85) !important;
   color: #fff !important;
   font-family: var(--mono) !important;
   font-weight: 700;

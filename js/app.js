@@ -7,6 +7,37 @@
    - Choroplèthes DVF (prix) et SSMSI (délinquance)
    ============================================================ */
 
+// ---------- Thème clair / sombre ----------
+const THEME_KEY = "lyon-data-theme";
+const VALID_THEMES = ["light", "dark"];
+function getStoredTheme() {
+  const raw = localStorage.getItem(THEME_KEY);
+  return VALID_THEMES.includes(raw) ? raw : "light";
+}
+function getCssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#ffffff";
+}
+function syncMapBasemapWithTheme(theme) {
+  const want = theme === "dark" ? "dark" : "light";
+  if (currentBasemap === want) return;
+  map.removeLayer(BASEMAPS[currentBasemap]);
+  currentBasemap = want;
+  BASEMAPS[currentBasemap].addTo(map);
+  const btn = document.getElementById("btn-basemap");
+  if (btn) btn.textContent = currentBasemap === "dark" ? "☀ Fond clair" : "☾ Fond sombre";
+}
+function applyTheme(theme, { persist = true, syncBasemap = true } = {}) {
+  if (!VALID_THEMES.includes(theme)) theme = "light";
+  document.documentElement.setAttribute("data-theme", theme);
+  if (persist) localStorage.setItem(THEME_KEY, theme);
+
+  const themeBtn = document.getElementById("btn-theme");
+  if (themeBtn) themeBtn.textContent = theme === "dark" ? "☀ Clair" : "🌙 Sombre";
+
+  if (syncBasemap && typeof map !== "undefined") syncMapBasemapWithTheme(theme);
+}
+applyTheme(getStoredTheme(), { syncBasemap: false });
+
 // ---------- Carte ----------
 const map = L.map("map", { zoomControl: false }).setView([45.7578, 4.8351], 13);
 L.control.zoom({ position: "bottomleft" }).addTo(map);
@@ -22,8 +53,10 @@ const BASEMAPS = {
     maxZoom: 19
   })
 };
-let currentBasemap = "dark";
-BASEMAPS.dark.addTo(map);
+let currentBasemap = getStoredTheme() === "dark" ? "dark" : "light";
+BASEMAPS[currentBasemap].addTo(map);
+document.getElementById("btn-basemap").textContent =
+  currentBasemap === "dark" ? "☀ Fond clair" : "☾ Fond sombre";
 
 document.getElementById("btn-basemap").addEventListener("click", () => {
   map.removeLayer(BASEMAPS[currentBasemap]);
@@ -31,6 +64,11 @@ document.getElementById("btn-basemap").addEventListener("click", () => {
   BASEMAPS[currentBasemap].addTo(map);
   document.getElementById("btn-basemap").textContent =
     currentBasemap === "dark" ? "☀ Fond clair" : "☾ Fond sombre";
+});
+
+document.getElementById("btn-theme").addEventListener("click", () => {
+  const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+  applyTheme(next);
 });
 
 // ---------- Barre d'état cartographique ----------
@@ -584,7 +622,7 @@ async function buildWfsLayer(def) {
         const fillColor = def.stationColorFn
           ? def.stationColorFn(feature.properties, def.color)
           : def.color;
-        return { color: "#0d1117", weight: 1.5, fillColor, fillOpacity: 0.95, opacity: 1 };
+        return { color: getCssVar('--marker-stroke'), weight: 1.5, fillColor, fillOpacity: 0.95, opacity: 1 };
       }
       let color = def.color;
       if (def.lineColorField && feature.properties[def.lineColorField]) {
@@ -603,7 +641,7 @@ async function buildWfsLayer(def) {
         ? def.stationColorFn(feature.properties, def.color)
         : def.color;
       const marker = L.circleMarker(latlng, {
-        radius: def.radius || 6.5, color: "#0d1117", weight: 1.5,
+        radius: def.radius || 6.5, color: getCssVar('--marker-stroke'), weight: 1.5,
         fillColor, fillOpacity: 0.95
       });
       marker._fillColor = fillColor;
@@ -647,7 +685,7 @@ async function buildVelovLayer(def) {
     if (bikes > 0) withBikes++;
     const color = bikes === 0 ? "#f8716a" : bikes < 4 ? "#fbbf24" : "#34d399";
     const marker = L.circleMarker([s.lat, s.lng], {
-      radius: 6.5, color: "#0d1117", weight: 1.5, fillColor: color, fillOpacity: 0.95
+      radius: 6.5, color: getCssVar('--marker-stroke'), weight: 1.5, fillColor: color, fillOpacity: 0.95
     });
     marker._layerDef = def;
     marker._poiProps = { name: s.name?.replace(/^\d+\s*-\s*/, "") || "Station Vélo'v", bikes, stands, address: s.address || "—", source: def.source };
@@ -687,7 +725,7 @@ async function buildOverpassLayer(def) {
     points.push([lat, lon]);
     const tags = el.tags || {};
     const marker = L.circleMarker([lat, lon], {
-      radius: 6.5, color: "#0d1117", weight: 1.5, fillColor: def.color, fillOpacity: 0.95
+      radius: 6.5, color: getCssVar('--marker-stroke'), weight: 1.5, fillColor: def.color, fillOpacity: 0.95
     });
     const addr = [tags["addr:housenumber"], tags["addr:street"]].filter(Boolean).join(" ");
     marker._layerDef = def;
@@ -764,7 +802,7 @@ async function buildDvfChoropleth(def) {
       const sales = salesByArrond[feature.properties.insee] || [];
       const med = median(sales.map((s) => s.ppm2));
       return {
-        color: "#0d1117", weight: 1.5,
+        color: getCssVar('--marker-stroke'), weight: 1.5,
         fillColor: med ? dvfColor(med) : "#555",
         fillOpacity: 0.7
       };
@@ -801,7 +839,7 @@ async function buildDvfPoints(def) {
       if (!s.lat || !s.lon) continue;
       points.push([s.lat, s.lon]);
       const marker = L.circleMarker([s.lat, s.lon], {
-        radius: 5.5, color: "#0d1117", weight: 1, fillColor: dvfColor(s.ppm2), fillOpacity: 0.92
+        radius: 5.5, color: getCssVar('--marker-stroke'), weight: 1, fillColor: dvfColor(s.ppm2), fillOpacity: 0.92
       });
       marker._layerDef = def;
       marker._poiProps = { title: `Appartement ${s.rooms ? s.rooms + " pièce(s), " : ""}${Math.round(s.surface)} m²`, price: s.price, ppm2: s.ppm2, surface: s.surface, rooms: s.rooms, date: s.date, source: def.source };
@@ -889,7 +927,7 @@ async function buildCrimeLayer(def) {
     style: (feature) => {
       const rate = crimeRate(feature.properties.insee, crimeIndicator);
       return {
-        color: "#0d1117", weight: 1.5,
+        color: getCssVar('--marker-stroke'), weight: 1.5,
         fillColor: rate != null ? crimeColor(rate, breaks) : "#555",
         fillOpacity: 0.7
       };
@@ -979,7 +1017,7 @@ async function buildEauPotableLayer(def) {
       const verdict = agg
         ? (eauIsConforme(agg.latest.conclusion_conformite_prelevement) ? "conforme" : "nonconforme")
         : "nodata";
-      return { color: "#0d1117", weight: 1.2, fillColor: EAU_COLORS[verdict], fillOpacity: 0.6 };
+      return { color: getCssVar('--marker-stroke'), weight: 1.2, fillColor: EAU_COLORS[verdict], fillOpacity: 0.6 };
     },
     onEachFeature: (feature, lyr) => {
       const agg = byCommune.get(feature.properties.insee);
