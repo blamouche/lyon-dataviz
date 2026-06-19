@@ -239,7 +239,7 @@ const CATALOG = [
         id: "velov", icon: "fa-bicycle", name: "Stations Vélo'v (temps réel)", desc: "Vélos et places disponibles, mis à jour en continu",
         subgroup: "🚲 Vélo",
         type: "velov",
-        color: "#d32f2f",
+        color: "#d32f2f", cluster: true,
         source: "JCDecaux / data.grandlyon.com"
       },
       {

@@ -1131,13 +1131,19 @@ async function buildVelovLayer(def) {
     marker.bindPopup(buildPopup(def, marker._poiProps));
     group.addLayer(marker);
   }
-  group._featureCount = stations.length;
-  group._points = stations.map((s) => [s.lat, s.lng]);
-  group._velovStats = {
+  let result = group;
+  if (def.cluster) {
+    result = clusterGroup(def.color, { disableClusteringAtZoom: 16 });
+    result.addLayer(group);
+  }
+
+  result._featureCount = stations.length;
+  result._points = stations.map((s) => [s.lat, s.lng]);
+  result._velovStats = {
     totalBikes, totalStands,
     pctWithBikes: stations.length ? Math.round((withBikes / stations.length) * 100) : 0
   };
-  return group;
+  return result;
 }
 
 async function buildOverpassLayer(def) {
