@@ -844,6 +844,39 @@ body { display: flex; flex-direction: column; }
 .map-attribution a { color: var(--ink-soft); text-decoration: underline; }
 .map-attribution a:hover { color: var(--accent); }
 
+/* ---------- Sélecteur de fond de carte ---------- */
+.basemap-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.55rem;
+}
+.basemap-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+.basemap-btn:hover { border-color: var(--accent); }
+.basemap-btn.active {
+  border-color: var(--accent);
+  background: rgba(45, 212, 191, 0.12);
+}
+.basemap-thumb {
+  width: 22px; height: 22px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.basemap-label { font-weight: 500; }
+
 .btn-locate i { font-size: 0.78rem; }
 
 .locate-marker { background: transparent; border: none; }

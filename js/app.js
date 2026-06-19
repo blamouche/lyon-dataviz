@@ -17,12 +17,19 @@ function getStoredTheme() {
 function getCssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#ffffff";
 }
+function setBasemap(id, { persist = true } = {}) {
+  const opt = BASEMAP_OPTIONS[id];
+  if (!opt || id === currentBasemap) return;
+  map.removeLayer(BASEMAP_OPTIONS[currentBasemap].tiles);
+  currentBasemap = id;
+  opt.tiles.addTo(map);
+  if (persist) localStorage.setItem(BASEMAP_KEY, id);
+  updateBasemapSelection();
+}
+
 function syncMapBasemapWithTheme(theme) {
-  const want = theme === "dark" ? "dark" : "light";
-  if (currentBasemap === want) return;
-  map.removeLayer(BASEMAPS[currentBasemap]);
-  currentBasemap = want;
-  BASEMAPS[currentBasemap].addTo(map);
+  // Le fond de carte reste celui choisi par l'utilisateur ; on ne change plus
+  // automatiquement au thème UI. Cette fonction est gardée pour compatibilité.
 }
 function applyTheme(theme, { persist = true, syncBasemap = true } = {}) {
   if (!VALID_THEMES.includes(theme)) theme = "light";
@@ -47,18 +54,43 @@ L.control.scale({ position: "bottomleft", imperial: false }).addTo(map);
 // L'attribution est affichée dans .map-statusbar pour rester toujours visible
 map.attributionControl.setPrefix("");
 
-const BASEMAPS = {
-  dark: L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    maxZoom: 19
-  }),
-  light: L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    maxZoom: 19
-  })
+const BASEMAP_OPTIONS = {
+  dark: {
+    label: "Sombre",
+    tiles: L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      maxZoom: 19
+    })
+  },
+  light: {
+    label: "Clair",
+    tiles: L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      maxZoom: 19
+    })
+  },
+  voyager: {
+    label: "Voyager",
+    tiles: L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      maxZoom: 19
+    })
+  },
+  satellite: {
+    label: "Satellite",
+    tiles: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+      attribution: 'Tiles &copy; Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+      maxZoom: 18
+    })
+  }
 };
-let currentBasemap = getStoredTheme() === "dark" ? "dark" : "light";
-BASEMAPS[currentBasemap].addTo(map);
+const BASEMAP_KEY = "lyon-data-basemap";
+function getStoredBasemap() {
+  const raw = localStorage.getItem(BASEMAP_KEY);
+  return BASEMAP_OPTIONS[raw] ? raw : "dark";
+}
+let currentBasemap = getStoredBasemap();
+BASEMAP_OPTIONS[currentBasemap].tiles.addTo(map);
 
 const themeBtn = document.getElementById("btn-theme");
 if (themeBtn) {
@@ -1646,6 +1678,35 @@ rightPanel.addEventListener("transitionend", (e) => {
     map.invalidateSize();
   }
 });
+
+// ---------- Sélecteur de fond de carte ----------
+const basemapGrid = $("#basemap-grid");
+function updateBasemapSelection() {
+  basemapGrid?.querySelectorAll(".basemap-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.basemap === currentBasemap);
+  });
+}
+
+Object.entries(BASEMAP_OPTIONS).forEach(([id, opt]) => {
+  const btn = document.createElement("button");
+  btn.className = "basemap-btn";
+  btn.dataset.basemap = id;
+  btn.title = opt.label;
+  btn.innerHTML = `<span class="basemap-thumb" style="background:${basemapThumbColor(id)}"></span><span class="basemap-label">${opt.label}</span>`;
+  btn.addEventListener("click", () => setBasemap(id));
+  basemapGrid?.appendChild(btn);
+});
+
+function basemapThumbColor(id) {
+  switch (id) {
+    case "dark": return "#0d1117";
+    case "light": return "#f8fafc";
+    case "voyager": return "#e2e8f0";
+    case "satellite": return "#14532d";
+    default: return "#64748b";
+  }
+}
+updateBasemapSelection();
 
 // ---------- Présélections et catalogue : sheets pliables sur mobile ----------
 const themeBar = $("#theme-bar");
