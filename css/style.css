@@ -629,6 +629,7 @@ body { display: flex; flex-direction: column; }
   padding: 0.85rem;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  cursor: pointer;
 }
 .right-panel-header h2 {
   display: flex;
@@ -640,6 +641,15 @@ body { display: flex; flex-direction: column; }
   letter-spacing: 0.12em;
   color: var(--ink-soft);
   margin: 0;
+}
+.right-panel-toggle {
+  display: none;
+  background: transparent;
+  border: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+  padding: 0.2rem;
+  font-size: 0.85rem;
 }
 
 .right-panel-body {
@@ -974,15 +984,20 @@ dialog a { color: var(--accent); }
     left: 0;
     right: 0;
     width: 100% !important;
-    max-height: 45vh;
+    max-height: none;
+    height: auto;
+    transform: translateY(calc(100% - 2.6rem));
     border-left: none;
     border-top: 1px solid var(--border);
     border-radius: var(--radius) var(--radius) 0 0;
     z-index: 1002;
     box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.45);
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-                opacity 0.3s;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
+  .right-panel.expanded { transform: translateY(0); max-height: 60vh; }
+  .right-panel-header { cursor: pointer; }
+  .right-panel-toggle { display: inline-flex; }
+  .right-panel.expanded .right-panel-toggle i { transform: rotate(180deg); }
 }
 
 /* ---------- Véhicules TCL (positions théoriques) ---------- */

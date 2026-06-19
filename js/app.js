@@ -1615,6 +1615,29 @@ function updateZoneStyles() {
 // Synthèse (KPI + graphiques + focus zone)
 // ============================================================
 const rightPanel = $("#right-panel");
+const rightPanelHeader = $("#right-panel-header");
+const rightPanelToggle = $("#right-panel-toggle");
+let isMobileSheetExpanded = false;
+const IS_MOBILE = () => window.matchMedia("(max-width: 760px)").matches;
+
+function setMobileSheetExpanded(expanded) {
+  isMobileSheetExpanded = expanded;
+  rightPanel.classList.toggle("expanded", expanded);
+  rightPanelToggle?.setAttribute("aria-label", expanded ? "Fermer la synthèse" : "Ouvrir la synthèse");
+}
+
+rightPanelHeader?.addEventListener("click", (e) => {
+  if (!IS_MOBILE()) return;
+  // Ne pas toggle si l'utilisateur clique sur un élément interactif du contenu
+  if (e.target.closest(".right-panel-body, a, button, input, select")) return;
+  setMobileSheetExpanded(!isMobileSheetExpanded);
+});
+
+rightPanelToggle?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (!IS_MOBILE()) return;
+  setMobileSheetExpanded(!isMobileSheetExpanded);
+});
 
 rightPanel.addEventListener("transitionend", (e) => {
   if (e.propertyName === "width" || e.propertyName === "transform") {
@@ -1634,12 +1657,17 @@ function updateInsights() {
   // Panneau pas encore visible → l'afficher avec animation
   if (rightPanel.hidden) {
     rightPanel.hidden = false;
-    rightPanel.style.width = "0";
-    rightPanel.style.opacity = "0";
-    requestAnimationFrame(() => {
-      rightPanel.style.width = "";
-      rightPanel.style.opacity = "";
-    });
+    if (IS_MOBILE()) {
+      // Sur mobile, la sheet est réduite par défaut ; on ne l'ouvre pas
+      setMobileSheetExpanded(false);
+    } else {
+      rightPanel.style.width = "0";
+      rightPanel.style.opacity = "0";
+      requestAnimationFrame(() => {
+        rightPanel.style.width = "";
+        rightPanel.style.opacity = "";
+      });
+    }
 
     // Fallback : transitionend peut ne pas se déclencher quand
     // le panneau passe de display:none à visible.
