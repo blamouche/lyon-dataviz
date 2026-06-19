@@ -1640,11 +1640,64 @@ rightPanelToggle?.addEventListener("click", (e) => {
 });
 
 rightPanel.addEventListener("transitionend", (e) => {
-  if (e.propertyName === "width" || e.propertyName === "transform") {
+  if (e.propertyName === "width" || e.propertyName === "transform" || e.propertyName === "max-height") {
     // invalidateSize(pan:true par défaut) recalcule la taille du conteneur
     // et appelle panBy pour recentrer la carte automatiquement.
     map.invalidateSize();
   }
+});
+
+// ---------- Présélections et catalogue : sheets pliables sur mobile ----------
+const themeBar = $("#theme-bar");
+const themeBarHeader = $("#theme-bar-header");
+const themeBarToggle = $("#theme-bar-toggle");
+const sidebar = $("#sidebar");
+const sidebarHeader = $("#sidebar-header");
+const sidebarToggle = $("#sidebar-toggle");
+let isThemeBarExpanded = false;
+let isSidebarExpanded = false;
+
+function setThemeBarExpanded(expanded) {
+  isThemeBarExpanded = expanded;
+  themeBar?.classList.toggle("expanded", expanded);
+  themeBarToggle?.setAttribute("aria-label", expanded ? "Fermer les présélections" : "Ouvrir les présélections");
+  if (expanded) setSidebarExpanded(false);
+}
+
+function setSidebarExpanded(expanded) {
+  isSidebarExpanded = expanded;
+  sidebar?.classList.toggle("expanded", expanded);
+  sidebarToggle?.setAttribute("aria-label", expanded ? "Fermer le catalogue" : "Ouvrir le catalogue");
+  if (expanded) setThemeBarExpanded(false);
+}
+
+themeBarHeader?.addEventListener("click", () => {
+  if (!IS_MOBILE()) return;
+  setThemeBarExpanded(!isThemeBarExpanded);
+});
+
+themeBarToggle?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (!IS_MOBILE()) return;
+  setThemeBarExpanded(!isThemeBarExpanded);
+});
+
+sidebarHeader?.addEventListener("click", () => {
+  if (!IS_MOBILE()) return;
+  setSidebarExpanded(!isSidebarExpanded);
+});
+
+sidebarToggle?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (!IS_MOBILE()) return;
+  setSidebarExpanded(!isSidebarExpanded);
+});
+
+[themeBar, sidebar].forEach((el) => {
+  if (!el) return;
+  el.addEventListener("transitionend", (e) => {
+    if (e.propertyName === "max-height") map.invalidateSize();
+  });
 });
 
 function updateInsights() {

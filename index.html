@@ -30,13 +30,21 @@
     </div>
   </header>
 
-  <div class="theme-bar" title="Cliquez pour ajouter ou retirer un jeu de couches. Plusieurs thèmes peuvent être combinés, ou aucun.">
-    <div class="theme-bar-label">Présélections thématiques</div>
-    <div class="theme-grid" id="theme-grid"></div>
+  <div class="theme-bar" id="theme-bar" title="Cliquez pour ajouter ou retirer un jeu de couches. Plusieurs thèmes peuvent être combinés, ou aucun.">
+    <div class="theme-bar-header" id="theme-bar-header">
+      <span class="theme-bar-label">Présélections thématiques</span>
+      <button class="theme-bar-toggle" id="theme-bar-toggle" aria-label="Ouvrir les présélections"><i class="fa-solid fa-chevron-down"></i></button>
+    </div>
+    <div class="theme-bar-body" id="theme-grid"></div>
   </div>
 
   <div class="layout">
     <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header" id="sidebar-header" title="Cliquer pour ouvrir/fermer le catalogue">
+        <span>Catalogue de données</span>
+        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Ouvrir le catalogue"><i class="fa-solid fa-chevron-down"></i></button>
+      </div>
+      <div class="sidebar-body">
       <section class="panel layers" id="layers-section">
         <h2>Catalogue de données</h2>
         <input type="search" id="layer-search" class="search-input"
@@ -56,6 +64,7 @@
           Cliquez sur une zone de la carte pour voir son détail dans la synthèse.</p>
         </div>
       </section>
+      </div>
 
       <footer class="sidebar-footer">
         <span class="mono">SOURCES</span> Métropole de Lyon · Ville de Lyon · data.gouv.fr · OpenStreetMap
