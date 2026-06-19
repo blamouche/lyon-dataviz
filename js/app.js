@@ -23,8 +23,6 @@ function syncMapBasemapWithTheme(theme) {
   map.removeLayer(BASEMAPS[currentBasemap]);
   currentBasemap = want;
   BASEMAPS[currentBasemap].addTo(map);
-  const btn = document.getElementById("btn-basemap");
-  if (btn) btn.textContent = currentBasemap === "dark" ? "☀ Fond clair" : "☾ Fond sombre";
 }
 function applyTheme(theme, { persist = true, syncBasemap = true } = {}) {
   if (!VALID_THEMES.includes(theme)) theme = "light";
@@ -55,16 +53,6 @@ const BASEMAPS = {
 };
 let currentBasemap = getStoredTheme() === "dark" ? "dark" : "light";
 BASEMAPS[currentBasemap].addTo(map);
-document.getElementById("btn-basemap").textContent =
-  currentBasemap === "dark" ? "☀ Fond clair" : "☾ Fond sombre";
-
-document.getElementById("btn-basemap").addEventListener("click", () => {
-  map.removeLayer(BASEMAPS[currentBasemap]);
-  currentBasemap = currentBasemap === "dark" ? "light" : "dark";
-  BASEMAPS[currentBasemap].addTo(map);
-  document.getElementById("btn-basemap").textContent =
-    currentBasemap === "dark" ? "☀ Fond clair" : "☾ Fond sombre";
-});
 
 document.getElementById("btn-theme").addEventListener("click", () => {
   const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
