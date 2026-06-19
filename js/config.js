@@ -585,6 +585,13 @@ const PRESELECTIONS = [
     layers: ["parcs", "marches", "piscines"]
   },
   {
+    id: "velo",
+    label: "Vélo",
+    emoji: "🚲",
+    hint: "Stations Vélo'v en temps réel et aménagements cyclables.",
+    layers: ["velov", "cyclable"]
+  },
+  {
     id: "qualite-environnementale",
     label: "Qualité environnementale",
     emoji: "🌍",
