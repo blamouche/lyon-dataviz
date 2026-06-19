@@ -171,33 +171,43 @@ body { display: flex; flex-direction: column; }
   font-size: 0.7rem;
 }
 
-.hint { font-size: 0.74rem; color: var(--ink-soft); margin: 0 0 0.6rem; line-height: 1.45; }
+.hint { font-size: 0.72rem; color: var(--ink-soft); margin: 0 0 0.45rem; line-height: 1.35; }
 
 /* ---------- Thèmes ---------- */
 .theme-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.45rem;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.35rem;
 }
 
 .theme-btn {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.25rem;
-  padding: 0.6rem 0.65rem;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.55rem;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
   cursor: pointer;
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 600;
   font-family: inherit;
   color: var(--ink);
   transition: all 0.15s ease;
   text-align: left;
+  min-width: 0;
 }
-.theme-btn .emoji { font-size: 1.15rem; filter: saturate(0.85); }
+.theme-btn .emoji {
+  font-size: 0.95rem;
+  filter: saturate(0.85);
+  flex-shrink: 0;
+}
+.theme-btn span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .theme-btn:hover { border-color: var(--accent); }
 .theme-btn.active {
   border-color: var(--accent);
@@ -848,7 +858,8 @@ dialog a { color: var(--accent); }
     border-right: none;
     border-bottom: 1px solid var(--border);
   }
-  .theme-grid { grid-template-columns: repeat(3, 1fr); }
+  .theme-grid { grid-template-columns: repeat(2, 1fr); }
+  .theme-btn { padding: 0.35rem 0.45rem; font-size: 0.72rem; }
   .data-badge { display: none; }
   .right-panel {
     position: fixed;
