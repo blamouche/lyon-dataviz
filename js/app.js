@@ -1499,10 +1499,10 @@ applyPreset(THEMES[0]);
   const el = document.getElementById("visit-count");
   if (!el) return;
   try {
-    const resp = await fetch("https://api.counterapi.dev/v1/blamouche/lyon-dataviz/up", { method: "POST" });
+    const resp = await fetch("https://api.counterapi.dev/v1/blamouche/lyon-dataviz/up");
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
-    el.textContent = Number(data.count).toLocaleString("fr-FR");
+    el.textContent = Number(data.count ?? data.value ?? data).toLocaleString("fr-FR");
   } catch (err) {
     console.warn("Compteur de visites indisponible", err);
     el.textContent = "—";
