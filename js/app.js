@@ -54,10 +54,13 @@ const BASEMAPS = {
 let currentBasemap = getStoredTheme() === "dark" ? "dark" : "light";
 BASEMAPS[currentBasemap].addTo(map);
 
-document.getElementById("btn-theme").addEventListener("click", () => {
-  const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
-  applyTheme(next);
-});
+const themeBtn = document.getElementById("btn-theme");
+if (themeBtn) {
+  themeBtn.addEventListener("click", () => {
+    const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    applyTheme(next);
+  });
+}
 
 // ---------- Barre d'état cartographique ----------
 map.on("mousemove", (e) => {
