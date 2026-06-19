@@ -300,11 +300,11 @@ function createVehicleMarker(latLng, bearing, route, vehicle, layerDef) {
   marker._layerDef = layerDef;
   marker._poiProps = { ligne: route.ligne, direction: route.nomTrace, departure: `${String(departureH).padStart(2, "0")}:${String(departureM).padStart(2, "0")}`, progress: progressPct, source: "Positions théoriques (horaires TCL)" };
   marker.bindPopup(
+    `<div class="popup-mini">` +
     `<div class="popup-title">Ligne ${route.ligne}</div>` +
-    `<div class="popup-row"><span class="k">Direction :</span><span>${route.nomTrace}</span></div>` +
-    `<div class="popup-row"><span class="k">Départ :</span><span class="v-num">${String(departureH).padStart(2, "0")}:${String(departureM).padStart(2, "0")}</span></div>` +
-    `<div class="popup-row"><span class="k">Progression :</span><span class="v-num">${progressPct} %</span></div>` +
-    `<div class="popup-src">Source : positions théoriques (horaires TCL)</div>`
+    `<div class="popup-type"><span class="popup-dot" style="background:${layerDef.color}"></span>${layerDef.name}</div>` +
+    `<div class="popup-hint">Fiche détaillée dans la synthèse →</div>` +
+    `</div>`
   );
 
   return marker;

@@ -435,119 +435,408 @@ function updateGroupCounts() {
   });
 }
 
-// ---------- Popups ----------
-function fmtValue(v) {
-  if (v === true) return "Oui";
-  if (v === false) return "Non";
-  if (Array.isArray(v)) return v.join(", ");
-  return String(v);
-}
+// ============================================================
+// Popups (carte) & fiches détaillées (panneau Synthèse)
+// ------------------------------------------------------------
+// La bulle sur la carte ne montre que le minimum (nom + type).
+// Le détail complet — un template propre à chaque type de donnée,
+// nourri de tous les champs renvoyés par l'API — s'affiche dans la
+// fiche du panneau de droite (buildPoiDetailHtml).
+// ============================================================
 
-function buildPopup(def, props) {
+// --- Échappement HTML & formateurs de valeurs ---
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+function fmtNum(n) { const x = Number(n); return isNaN(x) ? esc(n) : x.toLocaleString("fr-FR"); }
+function fmtDateFR(v) {
+  const d = new Date(v);
+  if (isNaN(d)) return esc(String(v));
+  return d.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+}
+function fmtHoraires(v) { return Array.isArray(v) ? v.map(esc).join("<br>") : esc(String(v)); }
+function telLink(v) { return `<a href="tel:${esc(String(v).replace(/[^\d+]/g, ""))}">${esc(v)}</a>`; }
+function mailLink(v) { return `<a href="mailto:${esc(v)}">${esc(v)}</a>`; }
+function urlLink(v, label) {
+  let u = String(v).trim(); if (!/^https?:/i.test(u)) u = "https://" + u;
+  return `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(label || v)}</a>`;
+}
+function humanize(k) { return k.replace(/[_:]/g, " ").replace(/^\w/, (c) => c.toUpperCase()); }
+function cap(s) { return String(s).charAt(0).toUpperCase() + String(s).slice(1); }
+
+// --- Titre & type affichés (carte + en-tête de fiche) ---
+function poiTitle(def, props) {
   const cfg = def.popup || {};
-  let title = cfg.title ? props[cfg.title] : null;
-  if (title == null || title === "") {
-    for (const k of ["nom", "name", "titre", "adresse", "libelle"]) {
-      if (props[k]) { title = props[k]; break; }
+  let t = cfg.title ? props[cfg.title] : null;
+  if (t == null || t === "") {
+    for (const k of ["nom", "name", "titre", "title_fr", "nom_enseigne", "nom_station", "essencefrancais", "lib_zone", "adresse", "libelle"]) {
+      if (props[k]) { t = props[k]; break; }
     }
   }
-  let html = `<div class="popup-title">${title ?? def.name}</div>`;
-  for (const row of cfg.rows || []) {
-    const [label, field, formatter] = row;
-    let v = props[field];
-    if (formatter) v = formatter(v);
+  return t ?? def.name;
+}
+function poiTypeLabel(def, props) {
+  const sub = props.nature || props.soustheme || props.type_equip || props.categorie;
+  if (sub && typeof sub === "string") return cap(String(sub).toLowerCase());
+  return def.name;
+}
+
+// --- Bulle carte : strict minimum (nom + type) ---
+function buildPopup(def, props) {
+  return `<div class="popup-mini">
+    <div class="popup-title">${esc(poiTitle(def, props))}</div>
+    <div class="popup-type"><span class="popup-dot" style="background:${def.color}"></span>${esc(poiTypeLabel(def, props))}</div>
+    <div class="popup-hint">Fiche détaillée dans la synthèse →</div>
+  </div>`;
+}
+
+// --- Primitives de fiche ---
+function fHead(title, sub, color) {
+  return `<div class="fiche-head">
+    <span class="fiche-dot" style="background:${color}"></span>
+    <div class="fiche-headtext">
+      <div class="fiche-title">${esc(title)}</div>
+      <div class="fiche-sub">${esc(sub)}</div>
+    </div>
+    <button class="poi-clear" onclick="selectedPoi=null;map.closePopup();updateInsights()" title="Fermer la fiche">✕</button>
+  </div>`;
+}
+function fSection(title, inner) {
+  if (!inner) return "";
+  return `<div class="fiche-section"><div class="fiche-sec-title">${esc(title)}</div>${inner}</div>`;
+}
+function fRow(label, value, opts = {}) {
+  if (value == null || value === "") return "";
+  const v = opts.html ? value : esc(String(value));
+  const cls = ["fiche-v", opts.mono && "mono", opts.strong && "strong", opts.accent && "accent"].filter(Boolean).join(" ");
+  return `<div class="fiche-row"><span class="fiche-k">${esc(label)}</span><span class="${cls}">${v}</span></div>`;
+}
+function fHero(value, label, color) {
+  return `<div class="fiche-hero"${color ? ` style="--hero:${color}"` : ""}>
+    <div class="fiche-hero-val">${value}</div><div class="fiche-hero-lbl">${esc(label)}</div></div>`;
+}
+function fBadges(arr) {
+  const items = arr.filter(Boolean).map((s) => `<span class="fiche-badge">${esc(s)}</span>`).join("");
+  return items ? `<div class="fiche-badges">${items}</div>` : "";
+}
+function fNote(text) { return text ? `<div class="fiche-note">${esc(text)}</div>` : ""; }
+
+// --- Dictionnaire de champs pour le template générique (WFS) ---
+// clé brute -> [libellé, section, formateur(optionnel, renvoie du HTML sûr)]
+const FIELD = {
+  nature: ["Nature", "Identité"], soustheme: ["Type", "Identité"], theme: ["Thème", "Identité"],
+  type: ["Type", "Identité"], categorie: ["Catégorie", "Identité"], statut_public_prive: ["Statut", "Identité"],
+  type_equip: ["Type d'équipement", "Identité"], label: ["Label", "Identité"], reglement: ["Règlement", "Identité"],
+  gestion: ["Gestion", "Identité"], gestionnaire: ["Gestionnaire", "Identité"], ctm: ["Territoire", "Identité"],
+  ministere_tutelle: ["Ministère de tutelle", "Identité"], circonscription: ["Circonscription", "Identité"],
+  nom_operateur: ["Opérateur", "Identité"], nom_amenageur: ["Aménageur", "Identité"],
+  nom_enseigne: ["Enseigne", "Identité"], nom_station: ["Station", "Identité"],
+  date_ouverture: ["Ouverture", "Identité", fmtDateFR], ann_ouvert: ["Année d'ouverture", "Identité"],
+  anneecreation: ["Année de création", "Identité"], datecreation: ["Création", "Identité", fmtDateFR],
+  essence: ["Nom scientifique", "Caractéristiques"], genre: ["Genre", "Caractéristiques"],
+  espece: ["Espèce", "Caractéristiques"], variete: ["Variété", "Caractéristiques"],
+  architecture: ["Port", "Caractéristiques"], naturerevetement: ["Revêtement", "Caractéristiques"],
+  circonference_cm: ["Circonférence", "Caractéristiques", (v) => v + " cm"],
+  hauteurtotale_m: ["Hauteur", "Caractéristiques", (v) => v + " m"],
+  hauteurfut_m: ["Hauteur du fût", "Caractéristiques", (v) => v + " m"],
+  diametrecouronne_m: ["Diamètre de couronne", "Caractéristiques", (v) => v + " m"],
+  anneeplantation: ["Année de plantation", "Caractéristiques"],
+  dateplantation: ["Date de plantation", "Caractéristiques", fmtDateFR],
+  capacite: ["Capacité", "Caractéristiques", (v) => fmtNum(v) + " places"],
+  nombre_d_eleves: ["Effectif", "Caractéristiques", (v) => fmtNum(v) + " élèves"],
+  surf_tot_m2: ["Superficie", "Caractéristiques", (v) => (v / 10000).toFixed(2) + " ha"],
+  nbemplacements: ["Emplacements", "Caractéristiques"], nbre_pdc: ["Points de charge", "Caractéristiques"],
+  puissance_nominale: ["Puissance", "Caractéristiques", (v) => v + " kW"],
+  tarification: ["Tarif", "Caractéristiques", (v) => v + " €"],
+  implantation_station: ["Implantation", "Caractéristiques"], typeautopartage: ["Réseau", "Caractéristiques"],
+  reseau: ["Réseau", "Caractéristiques"], typeamenagement: ["Aménagement", "Caractéristiques"],
+  senscirculation: ["Sens de circulation", "Caractéristiques"],
+  date_mise_en_service: ["Mise en service", "Caractéristiques", fmtDateFR],
+  anneerealisation: ["Année de réalisation", "Caractéristiques"],
+  horaires: ["Horaires", "Horaires & accès", fmtHoraires], precision_horaires: ["Précisions", "Horaires & accès"],
+  jourtenue: ["Jour de tenue", "Horaires & accès"], condition_acces: ["Conditions d'accès", "Horaires & accès"],
+  accessibilite_pmr: ["Accessibilité PMR", "Horaires & accès"], restriction_gabarit: ["Restriction gabarit", "Horaires & accès"],
+  acces: ["Accès", "Horaires & accès"], circulation: ["Circulation", "Horaires & accès"],
+  accesenviront: ["Environnement", "Horaires & accès"], dispojours: ["Jours de disponibilité", "Horaires & accès"],
+  dispohoraires: ["Disponibilité", "Horaires & accès"], etatfonctiont: ["État de fonctionnement", "Horaires & accès"],
+  etat: ["État", "Horaires & accès"],
+  adresse: ["Adresse", "Localisation"], commune: ["Commune", "Localisation"], code_postal: ["Code postal", "Localisation"],
+  codepost: ["Code postal", "Localisation"], nomvoie: ["Voie", "Localisation"], voie: ["Voie", "Localisation"],
+  localisation: ["Emplacement", "Localisation"], infoloc: ["Précision", "Localisation"],
+  precision_localisation: ["Précision", "Localisation"],
+  telephone: ["Téléphone", "Contact", telLink], telephone_operateur: ["Téléphone", "Contact", telLink],
+  mail: ["Courriel", "Contact", mailLink], contact_operateur: ["Contact opérateur", "Contact", mailLink],
+  url: ["Site web", "Contact", (v) => urlLink(v, "Ouvrir le site")],
+  observations: ["Observations", "Autres"]
+};
+// Champs booléens -> libellé (rendus en pastilles quand vrai)
+const BOOL_LABEL = {
+  restauration: "Restauration", hebergement: "Internat", ulis: "ULIS",
+  ecole_maternelle: "Maternelle", ecole_elementaire: "Élémentaire",
+  eau: "Point d'eau", toilettes: "Toilettes", chien: "Chiens admis", esp_can: "Espace canin",
+  banking: "Terminal de paiement", bonus: "Station bonus",
+  prise_type_2: "Prise Type 2", prise_type_combo_ccs: "Combo CCS", prise_type_chademo: "CHAdeMO",
+  prise_type_ef: "Prise E/F", prise_type_autre: "Autre prise",
+  gratuit: "Gratuit", paiement_cb: "Paiement CB", paiement_acte: "Paiement à l'acte",
+  paiement_autre: "Autre paiement", reservation: "Réservation", station_deux_roues: "Deux-roues",
+  cable_t2_attache: "Câble T2 attaché", electrodepediatrique: "Électrodes pédiatriques",
+  presenceaccueil: "Accueil sur place", presencepostesecurite: "Poste de sécurité",
+  pmr: "Accessible PMR", ascenseur: "Ascenseur"
+};
+// Champs techniques à ne jamais afficher
+const FIELD_DENY = new Set([
+  "gid", "uid", "id_ariane", "code_nature", "code_type_contrat_prive", "codeinsee", "codefuv", "codegenre",
+  "code_insee", "codinsee", "insee", "identifiant", "idexterne", "idstation", "id_station_itinerance",
+  "id_station_local", "id_pdc_itinerance", "id_pdc_local", "siren_siret", "siret", "siren_amenageur",
+  "num_pdl", "num", "numero", "multi_uai", "pial", "uai", "datemaj", "date_maj", "datereleve", "majdonnees",
+  "last_update", "last_update_fme", "last_update_gl", "provenance", "photo", "source", "openinghours",
+  "openinghoursspecification", "sameas", "wikipedia", "address", "effectifs_par_uai", "raccordement",
+  "code_insee_commune", "num_pdl", "numvoie", "clos", "isCrime"
+]);
+
+// --- Template générique (couches WFS hétérogènes) ---
+function ficheGeneric(def, props) {
+  const ORDER = ["Identité", "Localisation", "Caractéristiques", "Horaires & accès", "Contact", "Autres"];
+  const buckets = {}; ORDER.forEach((s) => (buckets[s] = ""));
+  const badges = [];
+  const titleKey = (def.popup && def.popup.title) || "nom";
+  for (const [k, v] of Object.entries(props)) {
     if (v == null || v === "" || v === "None") continue;
-    html += `<div class="popup-row"><span class="k">${label} :</span><span>${fmtValue(v)}</span></div>`;
+    if (k === titleKey || k === "source" || FIELD_DENY.has(k) || k.startsWith("_")) continue;
+    if (typeof v === "boolean") { if (v) badges.push(BOOL_LABEL[k] || humanize(k)); continue; }
+    if (typeof v === "object") continue;
+    const fd = FIELD[k];
+    if (fd) {
+      const [label, section, fmt] = fd;
+      buckets[section] += fRow(label, fmt ? fmt(v) : esc(String(v)), { html: true });
+    } else {
+      buckets["Autres"] += fRow(humanize(k), esc(String(v)), { html: true });
+    }
   }
-  html += `<div class="popup-src">Source : ${def.source}</div>`;
+  let html = "";
+  if (badges.length) html += fSection("Services & équipements", fBadges(badges));
+  for (const s of ORDER) if (buckets[s]) html += fSection(s, buckets[s]);
   return html;
 }
 
-// ---------- Fiche POI dans le panneau de droite ----------
-function poiRow(label, value, highlight = false) {
-  return `<div class="poi-row"><span class="poi-k">${label}</span><span class="poi-v${highlight ? " poi-highlight" : ""}">${value}</span></div>`;
+// --- Vélo'v (temps réel) ---
+function ficheVelov(p) {
+  const total = p.total != null ? p.total : (Number(p.bikes || 0) + Number(p.stands || 0));
+  const pct = total ? Math.round((p.bikes / total) * 100) : 0;
+  const open = p.status ? /open|ouv/i.test(p.status) : true;
+  let html = `<div class="fiche-gauge-row">
+    ${fHero(`<span class="mono">${p.bikes}</span>`, "vélos dispo.", "#34d399")}
+    ${fHero(`<span class="mono">${p.stands}</span>`, "places libres", "#60a5fa")}
+  </div>
+  <div class="fiche-gauge"><span style="width:${pct}%"></span></div>
+  <div class="fiche-gauge-cap">${p.bikes} / ${total} bornes occupées</div>`;
+  html += fSection("État", fBadges([open ? "Station ouverte" : "Station fermée", p.banking ? "Terminal de paiement" : null]));
+  let rows = "";
+  if (p.ebikes != null) rows += fRow("Vélos électriques", p.ebikes, { mono: true });
+  if (p.mbikes != null) rows += fRow("Vélos mécaniques", p.mbikes, { mono: true });
+  if (total) rows += fRow("Capacité totale", total + " bornes");
+  if (p.commune) rows += fRow("Commune", p.commune);
+  if (p.address) rows += fRow("Adresse", p.address);
+  if (p.last_update) rows += fRow("Mise à jour", fmtDateFR(p.last_update), { html: true });
+  html += fSection("Informations", rows);
+  return html;
 }
 
+// --- Gare ferroviaire SNCF (couche Métropole adrgareferpct) ---
+function ficheGare(p) {
+  let rows = "";
+  if (p.soustheme) rows += fRow("Type", p.soustheme);
+  if (p.idexterne) rows += fRow("Code gare (UIC)", String(p.idexterne), { mono: true });
+  if (p.identifiant) rows += fRow("Identifiant Métropole", p.identifiant, { mono: true });
+  let html = fSection("Informations", rows);
+  if (p.nom) {
+    const search = `https://www.garesetconnexions.sncf/fr/recherche?q=${encodeURIComponent(p.nom)}`;
+    html += fSection("Horaires & services", fRow("Fiche gare", urlLink(search, "SNCF Gares & Connexions"), { html: true }));
+  }
+  return html || fNote("Aucun détail supplémentaire disponible.");
+}
+
+// --- Évènement OpenAgenda (Fête de la musique) ---
+function ficheEvent(p) {
+  let html = "";
+  if (p.image) html += `<img class="fiche-img" src="${esc(p.image)}" alt="" loading="lazy">`;
+  if (p.quand) html += fSection("Quand", fRow("Date", p.quand, { strong: true }));
+  if (p.description) html += fNote(p.description);
+  let lieu = "";
+  if (p.lieu) lieu += fRow("Lieu", p.lieu, { strong: true });
+  if (p.adresse) lieu += fRow("Adresse", p.adresse);
+  if (p.quartier) lieu += fRow("Quartier", p.quartier);
+  if (p.acces) lieu += fRow("Accès", p.acces);
+  html += fSection("Où", lieu);
+  let prat = "";
+  if (p.age_min != null || p.age_max != null) {
+    const a = p.age_min != null && p.age_max != null ? `${p.age_min}–${p.age_max} ans`
+      : (p.age_min != null ? `dès ${p.age_min} ans` : `jusqu'à ${p.age_max} ans`);
+    prat += fRow("Public", a);
+  }
+  if (p.conditions) prat += fRow("Conditions", p.conditions);
+  if (p.accessibilite) prat += fRow("Accessibilité", p.accessibilite);
+  if (p.organisateur) prat += fRow("Organisateur", p.organisateur);
+  html += fSection("Infos pratiques", prat);
+  let liens = "";
+  if (p.url) liens += fRow("Programme", urlLink(p.url, "Voir l'évènement"), { html: true });
+  if (p.site) liens += fRow("Site du lieu", urlLink(p.site, "Ouvrir"), { html: true });
+  if (p.tel) liens += fRow("Téléphone", telLink(p.tel), { html: true });
+  html += fSection("Liens & contact", liens);
+  return html;
+}
+
+// --- Overpass / OpenStreetMap (police, pompiers, pharmacies) ---
+const OSM_LABEL = {
+  operator: "Exploitant", opening_hours: "Horaires", phone: "Téléphone", "contact:phone": "Téléphone",
+  website: "Site web", "contact:website": "Site web", email: "Courriel", "contact:email": "Courriel",
+  wheelchair: "Accès PMR", brand: "Enseigne", healthcare: "Type de soin", dispensing: "Délivre des médicaments",
+  emergency: "Urgences", description: "Description", "addr:postcode": "Code postal"
+};
+const OSM_DENY = new Set(["name", "source", "amenity", "addr:housenumber", "addr:street", "addr:city", "ref"]);
+function ficheOverpass(def, p) {
+  let rows = "";
+  if (p.adresse) rows += fRow("Adresse", p.adresse);
+  for (const [k, v] of Object.entries(p)) {
+    if (v == null || v === "" || typeof v === "object") continue;
+    if (k === "adresse" || k === "name" || k === "source" || k.startsWith("_") || OSM_DENY.has(k)) continue;
+    if (k.startsWith("addr:") && k !== "addr:postcode") continue;
+    const label = OSM_LABEL[k] || humanize(k);
+    let val = esc(String(v)), html = false;
+    if (/phone/.test(k)) { val = telLink(v); html = true; }
+    else if (/website|url/.test(k)) { val = urlLink(v, "Ouvrir"); html = true; }
+    else if (/email/.test(k)) { val = mailLink(v); html = true; }
+    else if (v === "yes") val = "Oui"; else if (v === "no") val = "Non";
+    rows += fRow(label, val, { html });
+  }
+  return fSection("Informations", rows) || fNote("Données OpenStreetMap limitées pour ce point.");
+}
+
+// --- Véhicule TCL (position théorique) ---
+function ficheVehicle(p) {
+  let html = fHero(`<span class="mono">${esc(p.ligne || "—")}</span>`, "ligne", "#E8308A");
+  let rows = "";
+  if (p.direction) rows += fRow("Direction", p.direction, { strong: true });
+  if (p.departure) rows += fRow("Départ", p.departure, { mono: true });
+  if (p.progress != null) rows += fRow("Progression estimée", p.progress + " %", { mono: true });
+  html += fSection("Course", rows);
+  html += fNote("Position estimée d'après les fréquences théoriques (non temps réel).");
+  return html;
+}
+
+// --- Vente DVF (point) ---
+function ficheDvfSale(p) {
+  let html = fHero(`<span class="mono">${fmtNum(Math.round(p.price))} €</span>`, "prix de vente", "#f59e0b");
+  let rows = "";
+  if (p.title) rows += fRow("Bien", p.title);
+  if (p.surface) rows += fRow("Surface", Math.round(p.surface) + " m²");
+  if (p.rooms) rows += fRow("Pièces", p.rooms);
+  if (p.ppm2) rows += fRow("Prix au m²", fmtNum(Math.round(p.ppm2)) + " €/m²", { mono: true });
+  if (p.date) rows += fRow("Date de vente", p.date);
+  html += fSection("Caractéristiques", rows);
+  return html;
+}
+
+// --- Choroplèthe DVF (arrondissement) ---
+function ficheDvfArrond(p) {
+  const name = p.nomreduit || p.nom;
+  let html = fHero(`<span class="mono">${p.medianPrice ? fmtNum(Math.round(p.medianPrice)) + " €/m²" : "n.d."}</span>`, "prix médian (appart. 2024)", "#fd8d3c");
+  let rows = "";
+  if (name) rows += fRow("Arrondissement", name, { strong: true });
+  if (p.salesCount != null) rows += fRow("Ventes analysées", fmtNum(p.salesCount), { mono: true });
+  html += fSection("Marché immobilier", rows);
+  return html;
+}
+
+// --- Choroplèthe délinquance (arrondissement) ---
+function ficheCrime(p) {
+  const insee = p.insee;
+  const data = window.DELINQUANCE_DATA;
+  const a = data?.arrondissements?.[insee];
+  const label = crimeIndicator === "__all__" ? "Tous les faits" : crimeIndicator;
+  const rate = crimeRate(insee, crimeIndicator);
+  const count = crimeCount(insee, crimeIndicator);
+  let html = fHero(`<span class="mono">${rate != null ? rate.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " ‰" : "n.d."}</span>`,
+    `${label.toLowerCase()} · pour 1 000 hab.`, "#a78bfa");
+  let rows = "";
+  if (p.nom) rows += fRow("Arrondissement", p.nom, { strong: true });
+  if (count != null) rows += fRow("Faits enregistrés", fmtNum(count), { mono: true });
+  if (a?.pop) rows += fRow("Population", fmtNum(a.pop), { mono: true });
+  rows += fRow("Millésime", data?.meta?.year);
+  html += fSection("Synthèse", rows);
+  // Détail par type de faits
+  if (a?.data) {
+    const items = data.indicateurs
+      .map((ind) => ({ ind, v: a.data[ind] ? a.data[ind][0] : null }))
+      .filter((x) => x.v != null).sort((x, y) => y.v - x.v);
+    let det = "";
+    for (const { ind, v } of items) det += fRow(ind, v.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " ‰", { mono: true });
+    html += fSection("Détail par type de faits", det);
+  }
+  return html;
+}
+
+// --- Choroplèthe eau potable (commune) ---
+function ficheEau(p) {
+  const agg = p._eau;
+  if (!agg) return fNote("Aucun contrôle sanitaire récent pour cette commune.");
+  const cmap = { C: "Conforme", N: "Non conforme", D: "Dérogation", S: "Surveillance" };
+  const conf = agg.conforme;
+  const rate = agg.total ? Math.round((agg.conformes / agg.total) * 100) : null;
+  let html = fHero(conf ? "✓" : "⚠", conf ? "eau conforme" : "non conforme", conf ? "#41ab5d" : "#d7301f");
+  let rows = "";
+  rows += fRow("Conformité bactériologique", cmap[agg.bact] || agg.bact || "—");
+  rows += fRow("Conformité physico-chimique", cmap[agg.pc] || agg.pc || "—");
+  if (rate != null) rows += fRow("Taux de conformité (6 mois)", rate + " %", { mono: true });
+  rows += fRow("Prélèvements analysés", fmtNum(agg.total), { mono: true });
+  if (agg.date) rows += fRow("Dernier contrôle", fmtDateFR(agg.date), { html: true });
+  html += fSection("Contrôle sanitaire", rows);
+  return html;
+}
+
+// --- Indice ATMO (qualité de l'air) ---
+function ficheAir(p) {
+  const sub = (code) => {
+    const s = ATMO_SCALE.find((x) => x.code === Math.round(code));
+    return s ? `<span class="fiche-chip" style="background:${s.color}">${esc(s.label)}</span>` : null;
+  };
+  let html = "";
+  if (p.lib_qual) html += fHero(esc(p.lib_qual), "qualité de l'air du jour", p.coul_qual || "#50CCAA");
+  let rows = "";
+  const pollu = [["Dioxyde d'azote (NO₂)", p.code_no2], ["Ozone (O₃)", p.code_o3],
+    ["Particules PM10", p.code_pm10], ["Particules fines PM2.5", p.code_pm25], ["Dioxyde de soufre (SO₂)", p.code_so2]];
+  for (const [label, code] of pollu) { if (code != null) { const c = sub(code); if (c) rows += fRow(label, c, { html: true }); } }
+  html += fSection("Sous-indices par polluant", rows);
+  let info = "";
+  if (p.lib_zone) info += fRow("Commune", p.lib_zone);
+  if (p.date_ech) info += fRow("Échéance", p.date_ech);
+  html += fSection("Informations", info);
+  return html;
+}
+
+// --- Aiguillage : un template par type de donnée ---
 function buildPoiDetailHtml(def, props, color) {
   const dotColor = color || def.color;
-  const cfg = def.popup || {};
-  // Titre
-  let title = cfg.title ? props[cfg.title] : null;
-  if (title == null || title === "") {
-    for (const k of ["nom", "name", "titre", "adresse", "libelle"]) {
-      if (props[k]) { title = props[k]; break; }
-    }
+  const title = poiTitle(def, props);
+  const sub = poiTypeLabel(def, props);
+  let body;
+  switch (def.type) {
+    case "velov": body = ficheVelov(props); break;
+    case "overpass": body = ficheOverpass(def, props); break;
+    case "openagenda": body = ficheEvent(props); break;
+    case "vehicles": body = ficheVehicle(props); break;
+    case "dvf-points": body = ficheDvfSale(props); break;
+    case "dvf-choropleth": body = ficheDvfArrond(props); break;
+    case "delinquance-choropleth": body = ficheCrime(props); break;
+    case "eau-potable-choropleth": body = ficheEau(props); break;
+    case "wfs": body = (def.id === "gares-sncf") ? ficheGare(props) : ficheGeneric(def, props); break;
+    default: body = (def.id === "air-indice") ? ficheAir(props) : ficheGeneric(def, props);
   }
-  title = title ?? def.name;
-
-  // Construction des lignes de détail — cas spéciaux d'abord
-  let rows = "";
-
-  // Vélo'v
-  if (props.bikes != null && props.stands != null) {
-    if (props.name) rows += poiRow("Station", props.name);
-    rows += poiRow("Vélos disponibles", props.bikes, true);
-    rows += poiRow("Places libres", props.stands);
-    if (props.address) rows += poiRow("Adresse", props.address);
-  }
-  // Véhicules TCL
-  else if (props.ligne != null && props.direction != null) {
-    rows += poiRow("Ligne", props.ligne, true);
-    rows += poiRow("Direction", props.direction);
-    if (props.departure) rows += poiRow("Départ", props.departure);
-    if (props.progress != null) rows += poiRow("Progression", props.progress + " %");
-  }
-  // Choroplèthe DVF (arrondissement)
-  else if (props.medianPrice != null) {
-    if (props.nomreduit || props.nom) rows += poiRow("Arrondissement", props.nomreduit || props.nom);
-    rows += poiRow("Prix médian", props.medianPrice ? Math.round(props.medianPrice).toLocaleString("fr-FR") + " €/m²" : "N/A", true);
-    if (props.salesCount != null) rows += poiRow("Ventes analysées", props.salesCount);
-  }
-  // Vente DVF (point)
-  else if (props.price != null && props.ppm2 != null) {
-    if (props.title) rows += poiRow("Type", props.title);
-    rows += poiRow("Prix de vente", Math.round(props.price).toLocaleString("fr-FR") + " €", true);
-    rows += poiRow("Prix au m²", Math.round(props.ppm2).toLocaleString("fr-FR") + " €/m²");
-    if (props.date) rows += poiRow("Date de vente", props.date);
-  }
-  // Config popup standard (WFS, etc.)
-  else if (cfg.rows && cfg.rows.length) {
-    for (const row of cfg.rows) {
-      const [label, field, formatter] = row;
-      let v = props[field];
-      if (formatter) v = formatter(v);
-      if (v == null || v === "" || v === "None") continue;
-      rows += poiRow(label, fmtValue(v));
-    }
-  }
-  // Fallback : afficher les props utiles (Overpass, etc.)
-  else {
-    const show = ["address", "adresse", "opening_hours", "horaires",
-      "phone", "telephone", "type", "soustheme", "nature",
-      "statut_public_prive", "capacite", "gestionnaire", "pmr", "ascenseur",
-      "desserte_merged", "typeamenagement", "reseau",
-      "infoloc", "acceslibre", "dispohoraires", "precision_horaires",
-      "commune", "surf_tot_m2", "jourtenue", "senscirculation",
-      "nom_enseigne", "nom_station", "nom_operateur", "nbemplacements",
-      "typeautopartage"];
-    for (const k of show) {
-      const v = props[k];
-      if (v == null || v === "" || v === "None" || typeof v === "object") continue;
-      const label = k.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
-      rows += poiRow(label, fmtValue(v));
-    }
-  }
-
   const source = props.source || def.source;
-  return `<div class="poi-detail">
-    <div class="poi-detail-head">
-      <span class="poi-dot" style="background:${dotColor}"></span>
-      <span class="poi-title">${title}</span>
-      <button class="poi-clear" onclick="selectedPoi=null;map.closePopup();updateInsights()">✕</button>
-    </div>
-    <div class="poi-layer">${def.name}</div>
-    ${rows}
-    <div class="poi-src">Source : ${source}</div>
+  return `<div class="fiche">
+    ${fHead(title, sub, dotColor)}
+    ${body || `<div class="fiche-note">Aucun détail supplémentaire disponible.</div>`}
+    <div class="fiche-src">Source : ${esc(source)}</div>
   </div>`;
 }
 
@@ -737,6 +1026,30 @@ async function buildWfsLayer(def) {
     result = clusterGroup(def.color, { disableClusteringAtZoom: 17 });
     result.addLayer(layer);
   }
+
+  // Visibilité conditionnelle au zoom minimum (ex. arbres d'alignement)
+  if (def.minZoom != null) {
+    const updateVisibility = () => {
+      const visible = map.getZoom() >= def.minZoom;
+      result.eachLayer((lyr) => {
+        const el = lyr.getElement?.();
+        if (el) el.style.opacity = visible ? "" : "0";
+      });
+    };
+    map.on("zoomend", updateVisibility);
+    // Premier rendu différé : les éléments DOM n'existent qu'après addTo(map)
+    const existingResume = result._resume;
+    result._resume = () => {
+      updateVisibility();
+      if (existingResume) existingResume();
+    };
+    const existingDestroy = result._destroy;
+    result._destroy = () => {
+      map.off("zoomend", updateVisibility);
+      if (existingDestroy) existingDestroy();
+    };
+  }
+
   result._featureCount = features.length;
   result._points = points;
   return result;
@@ -761,14 +1074,22 @@ async function buildVelovLayer(def) {
     marker._fillColor = color;
     marker._poiColor = color;
     marker._layerDef = def;
-    marker._poiProps = { name: s.name?.replace(/^\d+\s*-\s*/, "") || "Station Vélo'v", bikes, stands, address: s.address || "—", source: def.source };
-    marker.bindPopup(
-      `<div class="popup-title">🚲 ${s.name?.replace(/^\d+\s*-\s*/, "") || "Station Vélo'v"}</div>
-       <div class="popup-row"><span class="k">Vélos disponibles :</span><span><strong>${bikes}</strong></span></div>
-       <div class="popup-row"><span class="k">Places libres :</span><span class="v-num">${stands}</span></div>
-       <div class="popup-row"><span class="k">Adresse :</span><span>${s.address || "—"}</span></div>
-       <div class="popup-src">Source : ${def.source} — temps réel</div>`
-    );
+    const avail = s.total_stands?.availabilities || s.main_stands?.availabilities || {};
+    const capacity = s.bike_stands ?? s.total_stands?.capacity ?? (bikes + stands);
+    marker._poiProps = {
+      name: s.name?.replace(/^\d+\s*-\s*/, "") || "Station Vélo'v",
+      bikes, stands,
+      total: capacity,
+      ebikes: avail.electricalBikes ?? null,
+      mbikes: avail.mechanicalBikes ?? null,
+      banking: s.banking === true || s.banking === "1" || s.banking === 1,
+      status: s.status || s.etat,
+      commune: s.commune || null,
+      address: s.address || null,
+      last_update: s.last_update || s.last_update_gl || null,
+      source: def.source
+    };
+    marker.bindPopup(buildPopup(def, marker._poiProps));
     group.addLayer(marker);
   }
   group._featureCount = stations.length;
@@ -781,9 +1102,15 @@ async function buildVelovLayer(def) {
 }
 
 async function buildOverpassLayer(def) {
+  // Par défaut on se limite à la commune de Lyon ; certaines couches (ex.
+  // stations-service, surtout présentes en périphérie) préfèrent l'emprise
+  // élargie LYON_BBOX pour ne pas tronquer les résultats.
+  const selector = def.bbox
+    ? `nwr${def.osmFilter}(${LYON_BBOX[1]},${LYON_BBOX[0]},${LYON_BBOX[3]},${LYON_BBOX[2]});`
+    : `area["name"="Lyon"]["boundary"="administrative"]["admin_level"="8"]->.a;
+       nwr(area.a)${def.osmFilter};`;
   const query = `[out:json][timeout:30];
-    area["name"="Lyon"]["boundary"="administrative"]["admin_level"="8"]->.a;
-    nwr(area.a)${def.osmFilter};
+    ${selector}
     out center tags;`;
   const resp = await fetch(`${OVERPASS_URL}?data=${encodeURIComponent(query)}`);
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -798,16 +1125,12 @@ async function buildOverpassLayer(def) {
     points.push([lat, lon]);
     const tags = el.tags || {};
     const marker = L.marker([lat, lon], { icon: makePoiIcon(def, def.color), keyboard: false });
-    const addr = [tags["addr:housenumber"], tags["addr:street"]].filter(Boolean).join(" ");
+    const addr = [tags["addr:housenumber"], tags["addr:street"], tags["addr:postcode"], tags["addr:city"]]
+      .filter(Boolean).join(" ");
     marker._layerDef = def;
-    marker._poiProps = { name: tags.name || def.name, address: addr || null, opening_hours: tags.opening_hours || null, phone: tags.phone || null, source: def.source };
-    marker.bindPopup(
-      `<div class="popup-title">${tags.name || def.name}</div>
-       ${addr ? `<div class="popup-row"><span class="k">Adresse :</span><span>${addr}</span></div>` : ""}
-       ${tags.opening_hours ? `<div class="popup-row"><span class="k">Horaires :</span><span>${tags.opening_hours}</span></div>` : ""}
-       ${tags.phone ? `<div class="popup-row"><span class="k">Téléphone :</span><span>${tags.phone}</span></div>` : ""}
-       <div class="popup-src">Source : ${def.source}</div>`
-    );
+    // On conserve l'intégralité des tags OSM pour la fiche détaillée
+    marker._poiProps = { ...tags, name: tags.name || def.name, adresse: addr || null, source: def.source };
+    marker.bindPopup(buildPopup(def, marker._poiProps));
     group.addLayer(marker);
   }
   let result = group;
@@ -834,16 +1157,25 @@ async function buildOpenAgendaLayer(def) {
     if (!c || c.lat == null || c.lon == null) continue;
     points.push([c.lat, c.lon]);
     const start = r.firstdate_begin ? new Date(r.firstdate_begin) : null;
-    const horaire = start
-      ? start.toLocaleString("fr-FR", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })
-      : null;
+    const quand = r.daterange_fr || (start
+      ? cap(start.toLocaleString("fr-FR", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }))
+      : null);
     const props = {
       titre: r.title_fr || "Évènement",
-      horaire,
+      quand,
+      description: r.description_fr || r.longdescription_fr || null,
       lieu: r.location_name || null,
-      adresse: r.location_address || null,
-      description: r.location_description_fr || null,
+      adresse: [r.location_address, r.location_postalcode, r.location_city].filter(Boolean).join(" ") || null,
+      quartier: r.location_district || null,
+      acces: r.location_access_fr || null,
+      accessibilite: r.accessibility_label_fr || null,
+      age_min: r.age_min, age_max: r.age_max,
+      conditions: r.conditions_fr || null,
+      organisateur: r.contributor_organization || null,
       url: r.canonicalurl || null,
+      site: r.location_website || null,
+      tel: r.location_phone || null,
+      image: r.thumbnail || (r.image && (r.image.url || r.image)) || null,
       source: def.source
     };
     const marker = L.marker([c.lat, c.lon], { icon: makePoiIcon(def, def.color), keyboard: false });
@@ -928,13 +1260,7 @@ async function buildDvfChoropleth(def) {
                    median: med, count: sales.length });
       lyr._layerDef = def;
       lyr._poiProps = { ...feature.properties, medianPrice: med, salesCount: sales.length, source: def.source };
-      lyr.bindPopup(
-        `<div class="popup-title">${feature.properties.nom}</div>
-         <div class="popup-row"><span class="k">Prix médian :</span>
-           <span><strong>${med ? Math.round(med).toLocaleString("fr-FR") + " €/m²" : "données insuffisantes"}</strong></span></div>
-         <div class="popup-row"><span class="k">Ventes analysées :</span><span class="v-num">${sales.length}</span></div>
-         <div class="popup-src">Source : ${def.source} — appartements, 2024</div>`
-      );
+      lyr.bindPopup(buildPopup(def, lyr._poiProps));
     }
   });
   stats.sort((a, b) => a.insee.localeCompare(b.insee));
@@ -957,14 +1283,8 @@ async function buildDvfPoints(def) {
       marker._fillColor = fillColor;
       marker._poiColor = fillColor;
       marker._layerDef = def;
-      marker._poiProps = { title: `Appartement ${s.rooms ? s.rooms + " pièce(s), " : ""}${Math.round(s.surface)} m²`, price: s.price, ppm2: s.ppm2, surface: s.surface, rooms: s.rooms, date: s.date, source: def.source };
-      marker.bindPopup(
-        `<div class="popup-title">Appartement ${s.rooms ? s.rooms + " pièce(s), " : ""}${Math.round(s.surface)} m²</div>
-         <div class="popup-row"><span class="k">Prix de vente :</span><span><strong>${Math.round(s.price).toLocaleString("fr-FR")} €</strong></span></div>
-         <div class="popup-row"><span class="k">Prix au m² :</span><span class="v-num">${Math.round(s.ppm2).toLocaleString("fr-FR")} €/m²</span></div>
-         <div class="popup-row"><span class="k">Date de vente :</span><span class="v-num">${s.date}</span></div>
-         <div class="popup-src">Source : ${def.source}</div>`
-      );
+      marker._poiProps = { titre: `Appartement ${s.rooms ? s.rooms + " pièce(s), " : ""}${Math.round(s.surface)} m²`, title: `Appartement ${s.rooms ? s.rooms + " pièce(s), " : ""}${Math.round(s.surface)} m²`, price: s.price, ppm2: s.ppm2, surface: s.surface, rooms: s.rooms, date: s.date, source: def.source };
+      marker.bindPopup(buildPopup(def, marker._poiProps));
       cluster.addLayer(marker);
     }
   }
@@ -1018,21 +1338,6 @@ function crimeColor(rate, breaks) {
   return CRIME_COLORS[CRIME_COLORS.length - 1];
 }
 
-function crimePopup(def, props) {
-  const insee = props.insee;
-  const rate = crimeRate(insee, crimeIndicator);
-  const count = crimeCount(insee, crimeIndicator);
-  const pop = window.DELINQUANCE_DATA?.arrondissements?.[insee]?.pop;
-  const label = crimeIndicator === "__all__" ? "Tous les faits" : crimeIndicator;
-  return `<div class="popup-title">${props.nom}</div>
-    <div class="popup-row"><span class="k">${label} :</span></div>
-    <div class="popup-row"><span class="k">Taux :</span>
-      <span><strong>${rate != null ? rate.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " ‰" : "n.d."}</strong> (pour 1 000 hab.)</span></div>
-    <div class="popup-row"><span class="k">Faits enregistrés :</span><span class="v-num">${count != null ? count.toLocaleString("fr-FR") : "n.d."}</span></div>
-    ${pop ? `<div class="popup-row"><span class="k">Population :</span><span class="v-num">${pop.toLocaleString("fr-FR")}</span></div>` : ""}
-    <div class="popup-src">Source : ${def.source} — ${window.DELINQUANCE_DATA.meta.year}</div>`;
-}
-
 async function buildCrimeLayer(def) {
   if (!window.DELINQUANCE_DATA) throw new Error("data/delinquance-2025.js introuvable");
   const arrondBase = await getArrondGeojson();
@@ -1050,7 +1355,7 @@ async function buildCrimeLayer(def) {
     onEachFeature: (feature, lyr) => {
       lyr._layerDef = def;
       lyr._poiProps = { ...feature.properties, source: def.source, isCrime: true };
-      lyr.bindPopup(() => crimePopup(def, feature.properties));
+      lyr.bindPopup(() => buildPopup(def, feature.properties));
     }
   });
   layer._featureCount = arrondBase.features.length;
@@ -1071,28 +1376,6 @@ function restyleCrimeLayer() {
 
 // ---------- Eau potable (contrôle sanitaire ARS / Hub'Eau) ----------
 const eauIsConforme = (c) => !!c && /conforme/i.test(c) && !/non conforme/i.test(c);
-
-function eauPopup(def, props, agg) {
-  const name = props.nomreduit || props.nom;
-  if (!agg) {
-    return `<div class="popup-title">${name}</div>
-      <div class="popup-row"><span class="k">Eau potable :</span><span>aucun contrôle récent</span></div>
-      <div class="popup-src">Source : ${def.source}</div>`;
-  }
-  const conf = eauIsConforme(agg.latest.conclusion_conformite_prelevement);
-  const rate = agg.total ? Math.round((agg.conformes / agg.total) * 100) : null;
-  const cmap = { C: "Conforme", N: "Non conforme", D: "Dérogation", S: "Surveillance" };
-  const fmtC = (v) => cmap[v] || v || "—";
-  const d = agg.latest.date_prelevement ? agg.latest.date_prelevement.slice(0, 10) : "—";
-  return `<div class="popup-title">${name}</div>
-    <div class="popup-row"><span class="k">Verdict :</span><span><strong>${conf ? "✓ Eau conforme" : "⚠ Non conforme"}</strong></span></div>
-    <div class="popup-row"><span class="k">Conformité bactério. :</span><span>${fmtC(agg.latest.conformite_limites_bact_prelevement)}</span></div>
-    <div class="popup-row"><span class="k">Conformité physico-chim. :</span><span>${fmtC(agg.latest.conformite_limites_pc_prelevement)}</span></div>
-    <div class="popup-row"><span class="k">Taux de conformité (6 mois) :</span><span class="v-num">${rate != null ? rate + " %" : "—"}</span></div>
-    <div class="popup-row"><span class="k">Prélèvements analysés :</span><span class="v-num">${agg.total}</span></div>
-    <div class="popup-row"><span class="k">Dernier contrôle :</span><span class="v-num">${d}</span></div>
-    <div class="popup-src">Source : ${def.source} — contrôle sanitaire</div>`;
-}
 
 async function buildEauPotableLayer(def) {
   // 1) Polygones des communes de la Métropole
@@ -1142,8 +1425,17 @@ async function buildEauPotableLayer(def) {
         total: agg?.total || 0, conformes: agg?.conformes || 0
       });
       lyr._layerDef = def;
-      lyr._poiProps = { ...feature.properties, source: def.source };
-      lyr.bindPopup(eauPopup(def, feature.properties, agg));
+      lyr._poiProps = {
+        ...feature.properties, source: def.source,
+        _eau: agg ? {
+          conforme: eauIsConforme(agg.latest.conclusion_conformite_prelevement),
+          bact: agg.latest.conformite_limites_bact_prelevement,
+          pc: agg.latest.conformite_limites_pc_prelevement,
+          total: agg.total, conformes: agg.conformes,
+          date: agg.latest.date_prelevement ? agg.latest.date_prelevement.slice(0, 10) : null
+        } : null
+      };
+      lyr.bindPopup(buildPopup(def, feature.properties));
     }
   });
   layer._featureCount = communes.features.length;

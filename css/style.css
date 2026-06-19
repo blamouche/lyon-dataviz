@@ -402,38 +402,38 @@ body { display: flex; flex-direction: column; }
 .zone-row.total .zr-name { color: var(--ink); }
 
 /* Fiche POI sélectionné dans la synthèse */
-.poi-detail {
+/* ---------- Fiche détaillée (panneau Synthèse) ---------- */
+.fiche {
   border: 1px solid var(--border);
   background: var(--panel-2);
-  border-radius: 8px;
-  padding: 0.6rem 0.65rem;
+  border-radius: 10px;
+  padding: 0.7rem 0.75rem;
   margin-bottom: 0.6rem;
   border-left: 3px solid var(--accent);
 }
-.poi-detail-head {
+.fiche-head {
   display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin-bottom: 0.15rem;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
 }
-.poi-dot {
-  width: 10px;
-  height: 10px;
+.fiche-dot {
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   flex-shrink: 0;
-  box-shadow: 0 0 6px rgba(0,0,0,0.12);
+  margin-top: 0.2rem;
+  border: 1.5px solid var(--marker-stroke);
+  box-shadow: 0 0 6px rgba(0,0,0,0.18);
 }
-[data-theme="dark"] .poi-dot {
-  box-shadow: 0 0 6px rgba(255,255,255,0.12);
-}
-.poi-title {
-  font-size: 0.88rem;
-  font-weight: 700;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.fiche-headtext { flex: 1; min-width: 0; }
+.fiche-title { font-size: 0.95rem; font-weight: 700; line-height: 1.25; word-break: break-word; }
+.fiche-sub {
+  font-size: 0.66rem;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-top: 0.1rem;
 }
 .poi-clear {
   background: none;
@@ -447,31 +447,90 @@ body { display: flex; flex-direction: column; }
   transition: color 0.15s, border-color 0.15s;
 }
 .poi-clear:hover { color: var(--accent); border-color: var(--accent); }
-.poi-layer {
-  font-size: 0.68rem;
-  color: var(--ink-soft);
+
+.fiche-section { margin-top: 0.55rem; }
+.fiche-sec-title {
+  font-size: 0.62rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 0.4rem;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+  margin-bottom: 0.25rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid rgba(127,127,127,0.18);
 }
-.poi-row {
+[data-theme="dark"] .fiche-sec-title { border-bottom-color: rgba(35,46,59,0.6); }
+.fiche-row {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 0.5rem;
-  font-size: 0.76rem;
-  padding: 0.18rem 0;
-  border-bottom: 1px solid rgba(127, 127, 127, 0.18);
+  gap: 0.75rem;
+  font-size: 0.78rem;
+  padding: 0.16rem 0;
 }
-[data-theme="dark"] .poi-row {
-  border-bottom-color: rgba(35, 46, 59, 0.5);
+.fiche-k { color: var(--ink-soft); flex-shrink: 0; }
+.fiche-v { font-weight: 600; text-align: right; word-break: break-word; }
+.fiche-v.mono { font-family: var(--mono); }
+.fiche-v.strong { font-weight: 700; }
+.fiche-v.accent { color: var(--accent); }
+.fiche-v a { color: var(--accent); }
+
+/* Statistique “héros” (grand chiffre) */
+.fiche-gauge-row { display: flex; gap: 0.5rem; }
+.fiche-hero {
+  flex: 1;
+  text-align: center;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.4rem;
+  border-top: 3px solid var(--hero, var(--accent));
 }
-.poi-row:last-of-type { border-bottom: none; }
-.poi-k { color: var(--ink-soft); flex-shrink: 0; }
-.poi-v { font-weight: 600; text-align: right; word-break: break-word; }
-.poi-v.poi-highlight { font-family: var(--mono); color: var(--accent); font-size: 0.82rem; }
-.poi-src {
-  margin-top: 0.4rem;
+.fiche-hero-val { font-size: 1.25rem; font-weight: 700; line-height: 1.1; }
+.fiche-hero-lbl { font-size: 0.62rem; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 0.15rem; }
+
+/* Jauge (Vélo'v) */
+.fiche-gauge {
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(127,127,127,0.2);
+  overflow: hidden;
+  margin-top: 0.5rem;
+}
+.fiche-gauge > span { display: block; height: 100%; background: var(--accent); }
+.fiche-gauge-cap { font-size: 0.66rem; color: var(--ink-soft); text-align: center; margin-top: 0.2rem; }
+
+/* Pastilles (services, équipements) */
+.fiche-badges { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.fiche-badge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+}
+/* Pastille colorée (sous-indice ATMO) */
+.fiche-chip {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.08rem 0.45rem;
+  border-radius: 999px;
+  color: rgba(15,23,42,0.9);
+}
+/* Note / description libre */
+.fiche-note { font-size: 0.78rem; line-height: 1.45; color: var(--ink); margin-top: 0.5rem; }
+.fiche-img {
+  width: 100%;
+  max-height: 160px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 0.2rem;
+}
+.fiche-src {
+  margin-top: 0.6rem;
   font-size: 0.62rem;
   color: var(--ink-faint);
   text-transform: uppercase;
@@ -789,6 +848,23 @@ body { display: flex; flex-direction: column; }
   letter-spacing: 0.06em;
 }
 
+/* Bulle minimale (nom + type) — le détail est dans la synthèse */
+.popup-mini .popup-title { margin-bottom: 0.25rem; }
+.popup-type {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+}
+.popup-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; border: 1px solid var(--marker-stroke); }
+.popup-hint {
+  margin-top: 0.4rem;
+  font-size: 0.64rem;
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* Marqueurs ponctuels : pastille colorée + picto */
 .poi-divicon { background: transparent; border: none; }
 .poi-pin {
@@ -796,7 +872,7 @@ body { display: flex; flex-direction: column; }
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  border: 1.5px solid var(--marker-stroke);
+  border: none;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
   box-sizing: border-box;
   line-height: 1;

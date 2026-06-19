@@ -92,10 +92,16 @@ function feteMusiqueUrl() {
   const where = `search("fête de la musique") and location_city="Lyon"` +
     ` and firstdate_begin>="${FETE_MUSIQUE_YEAR}-06-01"` +
     ` and firstdate_begin<="${FETE_MUSIQUE_YEAR}-06-30"`;
+  const select = [
+    "title_fr", "description_fr", "longdescription_fr", "conditions_fr", "daterange_fr",
+    "firstdate_begin", "accessibility_label_fr", "age_min", "age_max",
+    "location_name", "location_address", "location_postalcode", "location_city",
+    "location_district", "location_access_fr", "location_phone", "location_website",
+    "location_coordinates", "contributor_organization", "thumbnail", "canonicalurl"
+  ].join(",");
   return `https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/` +
     `evenements-publics-openagenda/records?where=${encodeURIComponent(where)}` +
-    `&limit=100&select=title_fr,location_name,location_address,location_coordinates,` +
-    `firstdate_begin,location_description_fr,canonicalurl`;
+    `&limit=100&select=${select}`;
 }
 
 // Couleurs officielles des lignes TCL (métro, funiculaire, tramway)
@@ -214,20 +220,54 @@ const CATALOG = [
         source: "SYTRAL / data.grandlyon.com"
       },
       {
+        id: "voies-ferrees", name: "Lignes ferroviaires SNCF", desc: "Tracé des voies ferrées du réseau ferré national (hors tramway)",
+        subgroup: "🚆 Train",
+        type: "wfs", url: wfsUrl("grandlyon", "metropole-de-lyon:fpc_fond_plan_communaut.fpcvoieferree", true),
+        geom: "line", color: "#64748b", weight: 2,
+        filter: (props) => /^VOIFER/.test(props.typevoie || ""),
+        source: "Métropole de Lyon"
+      },
+      {
+        id: "gares-sncf", icon: "fa-train", name: "Gares SNCF", desc: "Gares et haltes ferroviaires",
+        subgroup: "🚆 Train",
+        type: "wfs", url: wfsUrl("grandlyon", "metropole-de-lyon:adr_voie_lieu.adrgareferpct", true),
+        geom: "point", color: "#334155",
+        popup: { title: "nom", rows: [["Type", "soustheme"]] },
+        source: "Métropole de Lyon"
+      },
+      {
         id: "velov", icon: "fa-bicycle", name: "Stations Vélo'v (temps réel)", desc: "Vélos et places disponibles, mis à jour en continu",
+        subgroup: "🚲 Vélo",
         type: "velov",
         color: "#d32f2f",
         source: "JCDecaux / data.grandlyon.com"
       },
       {
         id: "cyclable", name: "Aménagements cyclables", desc: "Pistes et bandes cyclables",
+        subgroup: "🚲 Vélo",
         type: "wfs", url: wfsUrl("grandlyon", "metropole-de-lyon:pvo_patrimoine_voirie.pvoamenagementcyclable", true),
         geom: "line", color: "#4ade80", weight: 2,
         popup: { title: "nom", rows: [["Type", "typeamenagement"], ["Réseau", "reseau"], ["Sens", "senscirculation"]] },
         source: "Métropole de Lyon"
       },
       {
+        id: "velo-reparation", icon: "fa-wrench", name: "Stations de réparation vélo", desc: "Pompes à vélo en libre-service",
+        subgroup: "🚲 Vélo",
+        type: "wfs", url: wfsUrl("grandlyon", "metropole-de-lyon:pvo_patrimoine_voirie.pvostationvelovpompe", true),
+        geom: "point", color: "#0891b2", cluster: true,
+        popup: { title: "nom", rows: [["Adresse", "adresse"]] },
+        source: "Métropole de Lyon"
+      },
+      {
+        id: "velo-magasins", icon: "fa-shop", name: "Magasins de vélo", desc: "Vente et réparation de vélos (commerces)",
+        subgroup: "🚲 Vélo",
+        type: "overpass", osmFilter: '["shop"="bicycle"]',
+        color: "#db2777", cluster: true,
+        source: "OpenStreetMap"
+      },
+      {
         id: "autopartage", icon: "fa-car-side", name: "Stations d'autopartage", desc: "Voitures en libre-service (Citiz…)",
+        subgroup: "🚗 Voiture",
         type: "wfs", url: wfsUrl("grandlyon", "metropole-de-lyon:pvo_patrimoine_voirie.pvostationautopartage", true),
         geom: "point", color: "#c084fc",
         popup: { title: "nom", rows: [["Adresse", "adresse"], ["Réseau", "typeautopartage"], ["Emplacements", "nbemplacements"]] },
@@ -235,10 +275,18 @@ const CATALOG = [
       },
       {
         id: "irve", icon: "fa-charging-station", name: "Bornes de recharge électrique", desc: "Bornes publiques pour véhicules électriques",
+        subgroup: "🚗 Voiture",
         type: "wfs", url: wfsUrl("grandlyon", "metropole-de-lyon:nrj_energie.irve", true),
         geom: "point", color: "#22d3ee", cluster: true,
         popup: { title: "nom_enseigne", rows: [["Station", "nom_station"], ["Adresse", "adresse_station"], ["Opérateur", "nom_operateur"]] },
         source: "Métropole de Lyon"
+      },
+      {
+        id: "stations-service", icon: "fa-gas-pump", name: "Stations-service", desc: "Stations-service et points de carburant",
+        subgroup: "🚗 Voiture",
+        type: "overpass", osmFilter: '["amenity"="fuel"]', bbox: true,
+        color: "#f97316", cluster: true,
+        source: "OpenStreetMap"
       }
     ]
   },
@@ -255,9 +303,9 @@ const CATALOG = [
         source: "Ville de Lyon / data.grandlyon.com"
       },
       {
-        id: "arbres", icon: "fa-tree", name: "Arbres d'alignement", desc: "Arbres recensés par la Métropole (≈ 10 000 dans Lyon)",
+        id: "arbres", name: "Arbres d'alignement", desc: "Arbres recensés par la Métropole (≈ 10 000 dans Lyon)",
         type: "wfs", url: wfsUrl("grandlyon", "metropole-de-lyon:abr_arbres_alignement.abrarbre", true),
-        geom: "point", color: "#16a34a", cluster: true, radius: 4,
+        geom: "point", color: "#16a34a", radius: 0.1, minZoom: 17,
         popup: { title: "essencefrancais", rows: [["Essence", "essence"], ["Commune", "commune"], ["Hauteur", "hauteurtotale_m", v => v ? v + " m" : null], ["Circonférence", "circonference_cm", v => v ? v + " cm" : null], ["Planté en", "anneeplantation"]] },
         source: "Métropole de Lyon"
       },
