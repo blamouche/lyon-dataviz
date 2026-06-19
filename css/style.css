@@ -1051,7 +1051,7 @@ dialog a { color: var(--accent); }
     gap: 0.3rem 0.5rem;
     padding: 0.35rem 0.85rem;
   }
-  .theme-bar-label { width: 100%; }
+  .theme-bar-label { display: none; }
   .theme-grid {
     flex-wrap: wrap;
     width: 100%;
