@@ -1030,6 +1030,30 @@ dialog a { color: var(--accent); }
   }
   .data-badge { display: none; }
 
+  /* --- Headers des sheets mobiles : style unifié --- */
+  .mobile-sheet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.55rem 0.85rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-soft);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .mobile-sheet-header button {
+    display: inline-flex;
+    background: transparent;
+    border: none;
+    color: var(--ink-soft);
+    cursor: pointer;
+    padding: 0.2rem;
+    font-size: 0.85rem;
+  }
+
   /* --- Barre de présélections : pliable, réduite par défaut --- */
   .theme-bar {
     flex-direction: column;
@@ -1041,8 +1065,6 @@ dialog a { color: var(--accent); }
     transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .theme-bar.expanded { max-height: 40vh; }
-  .theme-bar-header { display: flex; padding: 0.55rem 0.85rem; }
-  .theme-bar-toggle { display: inline-flex; }
   .theme-bar.expanded .theme-bar-toggle i { transform: rotate(180deg); }
   .theme-bar-body {
     flex-wrap: wrap;
@@ -1062,8 +1084,6 @@ dialog a { color: var(--accent); }
     transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .sidebar.expanded { max-height: 45vh; }
-  .sidebar-header { display: flex; }
-  .sidebar-toggle { display: inline-flex; }
   .sidebar.expanded .sidebar-toggle i { transform: rotate(180deg); }
   .sidebar-body {
     overflow-y: auto;
@@ -1089,8 +1109,6 @@ dialog a { color: var(--accent); }
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .right-panel.expanded { transform: translateY(0); max-height: 60vh; }
-  .right-panel-header { cursor: pointer; }
-  .right-panel-toggle { display: inline-flex; }
   .right-panel.expanded .right-panel-toggle i { transform: rotate(180deg); }
 }
 
