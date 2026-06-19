@@ -45,7 +45,6 @@ const AIR_TODAY = (() => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 })();
 // Échelle officielle de l'indice ATMO (libellés et couleurs Atmo France)
-// Les anciens ids "environnement" et "eau" sont regroupés dans "qualite-environnementale".
 const ATMO_SCALE = [
   { code: 1, label: "Bon",                 color: "#50F0E6" },
   { code: 2, label: "Moyen",               color: "#50CCAA" },
@@ -123,6 +122,57 @@ const ZONE_LEVELS = {
 };
 
 const THEMES = [
+  {
+    id: "canicule",
+    label: "Canicule",
+    emoji: "🌡️",
+    hint: "Parcs, arbres, cours d'eau, plans d'eau, fontaines d'eau potable et piscines pour se rafraîchir.",
+    layers: [
+      {
+        id: "parcs-canicule", name: "Parcs et jardins", desc: "Espaces verts publics de la ville",
+        type: "wfs", url: wfsUrl("grandlyon", "metropole-de-lyon:com_donnees_communales.comparcjardin_1_0_0", true),
+        geom: "polygon", color: "#34d399", fillOpacity: 0.45, defaultOn: true,
+        popup: { title: "nom", rows: [["Commune", "commune"], ["Surface", "surf_tot_m2", v => v ? (v/10000).toFixed(1) + " ha" : null], ["Horaires", "precision_horaires"]] },
+        source: "Ville de Lyon / data.grandlyon.com"
+      },
+      {
+        id: "plans-eau-canicule", name: "Plans d'eau", desc: "Surfaces d'eau (lacs, étangs, bras morts)",
+        type: "wfs", url: wfsUrl("grandlyon", "metropole-de-lyon:fpc_fond_plan_communaut.fpcplandeau", true),
+        geom: "polygon", color: "#60a5fa", fillOpacity: 0.5, defaultOn: true,
+        popup: { title: "gid", rows: [["Identifiant", "gid"]] },
+        source: "Métropole de Lyon"
+      },
+      {
+        id: "cours-eau-canicule", name: "Cours d'eau", desc: "Fleuves, rivières et ruisseaux (Rhône, Saône…)",
+        type: "wfs", url: wfsUrl("grandlyon", "metropole-de-lyon:adr_voie_lieu.adrlieulin", true),
+        geom: "line", color: "#3b82f6", weight: 2, defaultOn: true,
+        filter: (props) => props.theme === "HYDROGRAPHIE" && props.soustheme === "Cours d'eau",
+        popup: { title: "nom", rows: [["Nature", "soustheme"], ["Taille", "taille"]] },
+        source: "Métropole de Lyon"
+      },
+      {
+        id: "fontaines-canicule", name: "Fontaines d'eau potable", desc: "Bornes-fontaines et points d'eau potable accessibles au public",
+        type: "wfs", url: wfsUrl("grandlyon", "metropole-de-lyon:adr_voie_lieu.adrbornefontaine_latest", true),
+        geom: "point", color: "#0ea5e9", cluster: true, defaultOn: true,
+        popup: { title: "identifiant", rows: [["Année de pose", "anneepose"], ["Commune", "commune"]] },
+        source: "Métropole de Lyon / Eau du Grand Lyon"
+      },
+      {
+        id: "arbres-canicule", name: "Arbres d'alignement", desc: "Arbres recensés par la Métropole (≈ 10 000 dans Lyon)",
+        type: "wfs", url: wfsUrl("grandlyon", "metropole-de-lyon:abr_arbres_alignement.abrarbre", true),
+        geom: "point", color: "#16a34a", cluster: true, radius: 4, defaultOn: false,
+        popup: { title: "essencefrancais", rows: [["Essence", "essence"], ["Commune", "commune"], ["Hauteur", "hauteurtotale_m", v => v ? v + " m" : null], ["Circonférence", "circonference_cm", v => v ? v + " cm" : null], ["Planté en", "anneeplantation"]] },
+        source: "Métropole de Lyon"
+      },
+      {
+        id: "piscines-canicule", name: "Piscines", desc: "Piscines et centres nautiques publics",
+        type: "wfs", url: wfsUrl("grandlyon", "metropole-de-lyon:adr_voie_lieu.adrequippiscinepct", true),
+        geom: "point", color: "#38bdf8", defaultOn: false,
+        popup: { title: "nom", rows: [["Adresse", "adresse"], ["Téléphone", "telephone"], ["Horaires", "horaires"]] },
+        source: "Métropole de Lyon"
+      }
+    ]
+  },
   {
     id: "transports",
     label: "Transports",
@@ -402,57 +452,6 @@ const THEMES = [
         desc: "Conformité du contrôle sanitaire (ARS) par commune · 6 derniers mois",
         type: "eau-potable-choropleth", geom: "ramp", color: "#41ab5d", defaultOn: true,
         source: "Ministère de la Santé / ARS via Hub'Eau"
-      }
-    ]
-  },
-  {
-    id: "canicule",
-    label: "Canicule",
-    emoji: "🌡️",
-    hint: "Parcs, arbres, cours d'eau, plans d'eau, fontaines d'eau potable et piscines pour se rafraîchir.",
-    layers: [
-      {
-        id: "parcs-canicule", name: "Parcs et jardins", desc: "Espaces verts publics de la ville",
-        type: "wfs", url: wfsUrl("grandlyon", "metropole-de-lyon:com_donnees_communales.comparcjardin_1_0_0", true),
-        geom: "polygon", color: "#34d399", fillOpacity: 0.45, defaultOn: true,
-        popup: { title: "nom", rows: [["Commune", "commune"], ["Surface", "surf_tot_m2", v => v ? (v/10000).toFixed(1) + " ha" : null], ["Horaires", "precision_horaires"]] },
-        source: "Ville de Lyon / data.grandlyon.com"
-      },
-      {
-        id: "plans-eau-canicule", name: "Plans d'eau", desc: "Surfaces d'eau (lacs, étangs, bras morts)",
-        type: "wfs", url: wfsUrl("grandlyon", "metropole-de-lyon:fpc_fond_plan_communaut.fpcplandeau", true),
-        geom: "polygon", color: "#60a5fa", fillOpacity: 0.5, defaultOn: true,
-        popup: { title: "gid", rows: [["Identifiant", "gid"]] },
-        source: "Métropole de Lyon"
-      },
-      {
-        id: "cours-eau-canicule", name: "Cours d'eau", desc: "Fleuves, rivières et ruisseaux (Rhône, Saône…)",
-        type: "wfs", url: wfsUrl("grandlyon", "metropole-de-lyon:adr_voie_lieu.adrlieulin", true),
-        geom: "line", color: "#3b82f6", weight: 2, defaultOn: true,
-        filter: (props) => props.theme === "HYDROGRAPHIE" && props.soustheme === "Cours d'eau",
-        popup: { title: "nom", rows: [["Nature", "soustheme"], ["Taille", "taille"]] },
-        source: "Métropole de Lyon"
-      },
-      {
-        id: "fontaines-canicule", name: "Fontaines d'eau potable", desc: "Bornes-fontaines et points d'eau potable accessibles au public",
-        type: "wfs", url: wfsUrl("grandlyon", "metropole-de-lyon:adr_voie_lieu.adrbornefontaine_latest", true),
-        geom: "point", color: "#0ea5e9", cluster: true, defaultOn: true,
-        popup: { title: "identifiant", rows: [["Année de pose", "anneepose"], ["Commune", "commune"]] },
-        source: "Métropole de Lyon / Eau du Grand Lyon"
-      },
-      {
-        id: "arbres-canicule", name: "Arbres d'alignement", desc: "Arbres recensés par la Métropole (≈ 10 000 dans Lyon)",
-        type: "wfs", url: wfsUrl("grandlyon", "metropole-de-lyon:abr_arbres_alignement.abrarbre", true),
-        geom: "point", color: "#16a34a", cluster: true, radius: 4, defaultOn: false,
-        popup: { title: "essencefrancais", rows: [["Essence", "essence"], ["Commune", "commune"], ["Hauteur", "hauteurtotale_m", v => v ? v + " m" : null], ["Circonférence", "circonference_cm", v => v ? v + " cm" : null], ["Planté en", "anneeplantation"]] },
-        source: "Métropole de Lyon"
-      },
-      {
-        id: "piscines-canicule", name: "Piscines", desc: "Piscines et centres nautiques publics",
-        type: "wfs", url: wfsUrl("grandlyon", "metropole-de-lyon:adr_voie_lieu.adrequippiscinepct", true),
-        geom: "point", color: "#38bdf8", defaultOn: false,
-        popup: { title: "nom", rows: [["Adresse", "adresse"], ["Téléphone", "telephone"], ["Horaires", "horaires"]] },
-        source: "Métropole de Lyon"
       }
     ]
   }

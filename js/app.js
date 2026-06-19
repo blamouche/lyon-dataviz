@@ -1510,8 +1510,9 @@ function updateLegend() {
 // ---------- Dialog sources ----------
 $("#btn-sources").addEventListener("click", () => $("#sources-dialog").showModal());
 
-// ---------- Démarrage : aucun thème présélectionné ----------
-// L'utilisateur active lui-même les filtres thématiques.
+// ---------- Démarrage : présélection Canicule active par défaut ----------
+const CANICULE_THEME = THEMES.find((t) => t.id === "canicule");
+if (CANICULE_THEME) toggleTheme(CANICULE_THEME);
 
 // ---------- Compteur de visites ----------
 (async function updateVisitCounter() {
