@@ -550,13 +550,6 @@ const PRESELECTIONS = [
     layers: ["fete-musique"]
   },
   {
-    id: "transports",
-    label: "Transports",
-    emoji: "🚇",
-    hint: "Métro, tram et Vélo'v en temps réel.",
-    layers: ["metro", "stations-metro", "tram", "stations-tram", "velov"]
-  },
-  {
     id: "logement",
     label: "Logement",
     emoji: "🏠",
