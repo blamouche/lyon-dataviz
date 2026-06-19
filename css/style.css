@@ -688,13 +688,6 @@ body { display: flex; flex-direction: column; }
   line-height: 1.5;
 }
 .sidebar-footer .mono { color: var(--ink-soft); letter-spacing: 0.1em; font-size: 0.6rem; margin-right: 0.3rem; }
-.sidebar-footer .visit-count {
-  display: block;
-  margin-top: 0.35rem;
-  font-family: var(--mono);
-  font-size: 0.6rem;
-  color: var(--ink-faint);
-}
 
 /* ---------- Carte ---------- */
 .map-wrap { flex: 1; position: relative; min-width: 0; background: var(--bg); }

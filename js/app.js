@@ -1502,9 +1502,9 @@ applyPreset(THEMES[0]);
     const resp = await fetch("https://api.counterapi.dev/v1/blamouche/lyon-dataviz/up", { method: "POST" });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
-    el.textContent = `· ${Number(data.count).toLocaleString("fr-FR")} visites`;
+    el.textContent = Number(data.count).toLocaleString("fr-FR");
   } catch (err) {
     console.warn("Compteur de visites indisponible", err);
-    el.textContent = "";
+    el.textContent = "—";
   }
 })();
