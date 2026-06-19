@@ -769,7 +769,7 @@ body { display: flex; flex-direction: column; }
   display: flex;
   align-items: center;
   gap: 1.1rem;
-  padding: 0.3rem 0.9rem;
+  padding: 0.35rem 0.9rem;
   background: var(--map-status-bg);
   border-top: 1px solid var(--border);
   border-left: 1px solid var(--border);
@@ -779,6 +779,9 @@ body { display: flex; flex-direction: column; }
   letter-spacing: 0.06em;
   color: var(--ink-soft);
 }
+.map-attribution { margin-left: auto; }
+.map-attribution a { color: var(--ink-soft); text-decoration: underline; }
+.map-attribution a:hover { color: var(--accent); }
 
 .btn-locate i { font-size: 0.78rem; }
 

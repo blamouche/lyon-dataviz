@@ -44,6 +44,8 @@ applyTheme(getStoredTheme(), { syncBasemap: false });
 const map = L.map("map", { zoomControl: false, minZoom: 12 }).setView([45.7578, 4.8351], 12);
 L.control.zoom({ position: "bottomleft" }).addTo(map);
 L.control.scale({ position: "bottomleft", imperial: false }).addTo(map);
+// L'attribution est affichée dans .map-statusbar pour rester toujours visible
+map.attributionControl.setPrefix("");
 
 const BASEMAPS = {
   dark: L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
